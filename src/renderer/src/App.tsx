@@ -1,6 +1,8 @@
 import type { DownloadState } from '@shared/types'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { TitleBar, type TitleBarStatus } from './components/TitleBar'
+import { DownloadConfirmationDialog } from './components/DownloadConfirmationDialog'
+import { DownloadQueueDialog } from './components/DownloadQueueDialog'
 import { NetworkBindingDialog } from './components/NetworkBindingDialog'
 import { UpdateDialog } from './components/UpdateDialog'
 import { TooltipProvider } from './components/ui/tooltip'
@@ -66,6 +68,18 @@ function renderDownload(
 function App(): React.JSX.Element {
   useDownloadEvents()
   useNetworkEvents()
+  const [queueCount, setQueueCount] = useState(0)
+  const [queueOpen, setQueueOpen] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    void window.plexo.getQueuedDownloads().then((queue) => mounted && setQueueCount(queue.length))
+    const unsubscribe = window.plexo.onDownloadQueueChanged((queue) => setQueueCount(queue.length))
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [])
 
   const interfaces = useAppStore((store) => store.interfaces)
   const interfacesStatus = useAppStore((store) => store.interfacesStatus)
@@ -111,10 +125,16 @@ function App(): React.JSX.Element {
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col">
-        <TitleBar status={titleBarStatus} />
+        <TitleBar
+          status={titleBarStatus}
+          queueCount={queueCount}
+          onOpenQueue={() => setQueueOpen(true)}
+        />
         <div className="min-h-0 flex-1">{screen}</div>
         <UpdateDialog />
         <NetworkBindingDialog />
+        <DownloadConfirmationDialog />
+        <DownloadQueueDialog open={queueOpen} onOpenChange={setQueueOpen} />
       </div>
     </TooltipProvider>
   )

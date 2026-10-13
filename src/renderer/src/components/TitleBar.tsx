@@ -1,6 +1,8 @@
 import { ColorBadge } from './ColorBadge'
 import { ThemeToggle } from './ThemeToggle'
 import { UpdateIndicator } from './UpdateIndicator'
+import { Button } from './ui/button'
+import { ListPlus } from 'lucide-react'
 
 export type TitleBarStatus =
   | { kind: 'none' }
@@ -14,7 +16,15 @@ const pillClass =
   'h-auto flex items-center gap-[7px] rounded-full px-2.5 py-1 font-mono text-[10px] leading-none font-semibold tracking-[0.08em] uppercase whitespace-nowrap'
 const pillDotClass = 'size-1.5 shrink-0 rounded-full'
 
-export function TitleBar({ status }: { status: TitleBarStatus }): React.JSX.Element {
+export function TitleBar({
+  status,
+  queueCount,
+  onOpenQueue
+}: {
+  status: TitleBarStatus
+  queueCount: number
+  onOpenQueue: () => void
+}): React.JSX.Element {
   const dimmed = status.kind === 'offline'
 
   return (
@@ -69,6 +79,20 @@ export function TitleBar({ status }: { status: TitleBarStatus }): React.JSX.Elem
           Offline
         </ColorBadge>
       )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 gap-1.5 px-2 text-[11px] [-webkit-app-region:no-drag]"
+        onClick={onOpenQueue}
+        aria-label={`Open download queue${queueCount ? `, ${queueCount} waiting` : ''}`}
+      >
+        <ListPlus className="size-3.5" />
+        Queue
+        {queueCount > 0 && (
+          <span className="font-mono text-[9px] text-muted-foreground">{queueCount}</span>
+        )}
+      </Button>
       <div className="hidden font-mono text-[9px] text-muted-foreground sm:block">
         Made by Sheeda Musalli
       </div>

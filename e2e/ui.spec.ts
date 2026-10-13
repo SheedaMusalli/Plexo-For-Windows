@@ -23,6 +23,22 @@ async function stubNativeUi(
 }
 
 test.describe('UI journeys @smoke', () => {
+  test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
+    const page = plexo.page
+    await page.getByRole('button', { name: /^Open download queue/ }).click()
+    await expect(page.getByRole('heading', { name: 'Schedule and batch downloads' })).toBeVisible()
+    await page
+      .getByRole('textbox', { name: 'Download links' })
+      .fill('https://example.com/alpha.zip\nhttps://example.com/beta.zip')
+    await page.locator('input[type="datetime-local"]').fill('2099-01-01T12:00')
+    await page.getByRole('button', { name: 'Add to queue' }).click()
+    await expect(page.getByText('Waiting (2)')).toBeVisible()
+    await expect(page.getByText('alpha.zip')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel alpha.zip' }).click()
+    await expect(page.getByText('Waiting (1)')).toBeVisible()
+    await expect(page.getByText('beta.zip')).toBeVisible()
+  })
+
   test('paste a link, start, pause, resume, finish, reveal the file', async ({
     plexo,
     serve,

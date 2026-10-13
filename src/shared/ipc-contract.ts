@@ -3,6 +3,7 @@ import type {
   DownloadUpdate,
   NetworkInterfaceInfo,
   ProbeResult,
+  QueuedDownload,
   StartDownloadRequest,
   UpdateInfo
 } from './types'
@@ -22,6 +23,16 @@ export interface IpcContract {
   readClipboardText: { args: []; result: string }
   revealInFolder: { args: [filePath: string]; result: void }
   openFile: { args: [filePath: string]; result: void }
+  respondDownloadConfirmation: {
+    args: [requestId: string, accepted: boolean]
+    result: void
+  }
+  getQueuedDownloads: { args: []; result: QueuedDownload[] }
+  queueDownloads: {
+    args: [urls: string[], destinationDir: string, scheduledAt: number | null]
+    result: void
+  }
+  cancelQueuedDownload: { args: [id: string]; result: void }
   startDownload: { args: [request: StartDownloadRequest]; result: string }
   getCurrentDownload: { args: []; result: DownloadUpdate | null }
   pauseDownload: { args: [id: string]; result: void }

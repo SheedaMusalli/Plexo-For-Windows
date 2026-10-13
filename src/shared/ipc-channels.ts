@@ -10,6 +10,10 @@ export const IpcChannels = {
   readClipboardText: 'clipboard:read-text',
   revealInFolder: 'shell:reveal-in-folder',
   openFile: 'shell:open-file',
+  respondDownloadConfirmation: 'download:confirmation-response',
+  getQueuedDownloads: 'download:queue-get',
+  queueDownloads: 'download:queue-add',
+  cancelQueuedDownload: 'download:queue-cancel',
   startDownload: 'download:start',
   getCurrentDownload: 'download:get-current',
   pauseDownload: 'download:pause',
@@ -18,6 +22,8 @@ export const IpcChannels = {
   cancelDownload: 'download:cancel',
   removeDownload: 'download:remove',
   downloadUpdated: 'download:updated',
+  downloadConfirmation: 'download:confirmation',
+  downloadQueueChanged: 'download:queue-changed',
   networksChanged: 'network:changed',
   checkForUpdate: 'update:check'
 } as const

@@ -224,3 +224,18 @@ export interface StartDownloadRequest {
   /** Internal transfers such as YouTube's separate audio/video streams should not notify on completion. */
   suppressNotifications?: boolean
 }
+
+export interface DownloadConfirmationRequest {
+  requestId: string
+  fileName: string
+  details: string
+}
+
+export interface QueuedDownload {
+  id: string
+  url: string
+  fileName: string
+  destinationDir: string
+  scheduledAt: number | null
+  error?: string
+}

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir, rename, rm, stat, statfs, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { BrowserWindow } from 'electron'
-import { app, Notification, powerSaveBlocker } from 'electron'
+import { app, Notification, powerSaveBlocker, safeStorage } from 'electron'
 import { IpcChannels } from '../../shared/ipc-channels'
 import type {
   BlockState,
@@ -12,8 +12,10 @@ import type {
   DownloadState,
   DownloadStatus,
   DownloadUpdate,
+  DownloadConfirmationRequest,
   NetworkInterfaceInfo,
   NetworkStatus,
+  QueuedDownload,
   StartDownloadRequest
 } from '../../shared/types'
 import { testKnobs, testStreamsPerNetwork } from '../testKnobs'
@@ -23,6 +25,7 @@ import { downloadChunk, fetchRange, HttpStatusError, RemoteChangedError } from '
 import { DownloadFile } from './downloadFile'
 import { compareVersion, type FileVersion } from './fileVersion'
 import { ensureDirectory, reserveDestinationPath } from './paths'
+import { probeUrl } from './probe'
 import {
   interleave,
   MAX_STREAMS_PER_NETWORK,
@@ -465,7 +468,16 @@ async function ensureDiskSpace(destinationDir: string, requiredBytes: number): P
 
 export class DownloadManager {
   private runtimes = new Map<string, DownloadRuntime>()
+  private downloadConfirmations = new Map<
+    string,
+    { resolve: (accepted: boolean) => void; timer: NodeJS.Timeout }
+  >()
   private readonly initialization: Promise<void>
+  private queuedDownloads: QueuedDownload[] = []
+  private queueTimer: NodeJS.Timeout | null = null
+  private processingQueue = false
+  private processingQueueId: string | null = null
+  private cancelledQueueIds = new Set<string>()
   private suspending = false
   /** Each network's addresses as last seen, by id: what tells a network that has changed. */
   private seenAddresses = new Map<string, string[]>()
@@ -476,7 +488,181 @@ export class DownloadManager {
     private getWindow: () => BrowserWindow | null,
     private networks: NetworkMonitor
   ) {
-    this.initialization = this.restorePersistedDownloads()
+    this.initialization = this.restorePersistedDownloads().then(async () => {
+      await this.restoreQueuedDownloads()
+      this.queueTimer = setInterval(() => void this.processQueue(), 1500)
+      this.queueTimer.unref()
+      void this.processQueue()
+    })
+  }
+
+  private queuePath(): string {
+    return join(app.getPath('userData'), 'scheduled-downloads.bin')
+  }
+
+  private async restoreQueuedDownloads(): Promise<void> {
+    try {
+      if (!safeStorage.isEncryptionAvailable()) return
+      const saved = JSON.parse(
+        safeStorage.decryptString(await readFile(this.queuePath()))
+      ) as unknown
+      if (Array.isArray(saved)) {
+        this.queuedDownloads = saved.filter(
+          (item): item is QueuedDownload =>
+            !!item &&
+            typeof item.id === 'string' &&
+            typeof item.url === 'string' &&
+            typeof item.fileName === 'string' &&
+            typeof item.destinationDir === 'string' &&
+            (item.scheduledAt === null || typeof item.scheduledAt === 'number')
+        )
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+        console.error('Could not restore scheduled downloads', error)
+    }
+  }
+
+  private async saveQueuedDownloads(): Promise<void> {
+    if (!safeStorage.isEncryptionAvailable())
+      throw new Error('Windows credential encryption unavailable')
+    await writeFile(
+      `${this.queuePath()}.tmp`,
+      safeStorage.encryptString(JSON.stringify(this.queuedDownloads))
+    )
+    await rename(`${this.queuePath()}.tmp`, this.queuePath())
+  }
+
+  private publishQueue(): void {
+    const window = this.getWindow()
+    if (window && !window.isDestroyed()) {
+      window.webContents.send(
+        IpcChannels.downloadQueueChanged,
+        structuredClone(this.queuedDownloads)
+      )
+    }
+  }
+
+  async getQueuedDownloads(): Promise<QueuedDownload[]> {
+    await this.initialization
+    return structuredClone(this.queuedDownloads)
+  }
+
+  async queueDownloads(
+    urls: string[],
+    destinationDir: string,
+    scheduledAt: number | null
+  ): Promise<void> {
+    await this.initialization
+    if (!Array.isArray(urls) || urls.length < 1 || urls.length > 50)
+      throw new Error('Add between 1 and 50 download links.')
+    if (this.queuedDownloads.length + urls.length > 100)
+      throw new Error('Plexo can keep up to 100 downloads in the queue.')
+    if (typeof destinationDir !== 'string' || !destinationDir.trim())
+      throw new Error('Choose a destination folder first.')
+    if (scheduledAt !== null && (!Number.isFinite(scheduledAt) || scheduledAt <= Date.now()))
+      throw new Error('Choose a future date and time.')
+    const entries = urls.map((raw) => {
+      const parsed = new URL(raw.trim())
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password)
+        throw new Error('Only public HTTP and HTTPS download links can be queued.')
+      let fileName = parsed.pathname.split('/').filter(Boolean).pop() || 'download'
+      try {
+        fileName = decodeURIComponent(fileName)
+      } catch {
+        /* Keep the readable raw name. */
+      }
+      return {
+        id: randomUUID(),
+        url: parsed.href,
+        fileName: fileName.slice(0, 240),
+        destinationDir,
+        scheduledAt
+      } satisfies QueuedDownload
+    })
+    this.queuedDownloads.push(...entries)
+    try {
+      await this.saveQueuedDownloads()
+      this.publishQueue()
+      void this.processQueue()
+    } catch (error) {
+      this.queuedDownloads.splice(-entries.length, entries.length)
+      throw error
+    }
+  }
+
+  async cancelQueuedDownload(id: string): Promise<void> {
+    await this.initialization
+    const previous = this.queuedDownloads
+    if (previous.some((item) => item.id === id) && this.processingQueueId === id) {
+      this.cancelledQueueIds.add(id)
+    }
+    this.queuedDownloads = previous.filter((item) => item.id !== id)
+    if (previous.length === this.queuedDownloads.length) return
+    try {
+      await this.saveQueuedDownloads()
+      this.publishQueue()
+    } catch (error) {
+      this.queuedDownloads = previous
+      this.cancelledQueueIds.delete(id)
+      throw error
+    }
+  }
+
+  private async processQueue(): Promise<void> {
+    if (this.processingQueue || this.queuedDownloads.length === 0) return
+    this.processingQueue = true
+    try {
+      const current = await this.getCurrentDownload()
+      if (current && ['downloading', 'paused', 'error'].includes(current.state.status)) return
+      const next = this.queuedDownloads[0]
+      if (!next || next.error || (next.scheduledAt !== null && next.scheduledAt > Date.now()))
+        return
+      this.processingQueueId = next.id
+      if (current?.state.browserRequestId === next.id) {
+        this.queuedDownloads.shift()
+        await this.saveQueuedDownloads()
+        this.publishQueue()
+        return
+      }
+      try {
+        const probe = await probeUrl(next.url)
+        if (/text\/html|application\/xhtml/i.test(probe.contentType ?? ''))
+          throw new Error('The server returned a web page or sign-in challenge, not a file.')
+        if (/mpegurl|dash\+xml/i.test(probe.contentType ?? ''))
+          throw new Error('This is a segmented streaming playlist, not a standalone file.')
+        if (!this.queuedDownloads.some((entry) => entry.id === next.id)) return
+        const interfaces = await this.networks.refresh()
+        if (!this.queuedDownloads.some((entry) => entry.id === next.id)) return
+        const downloadId = await this.start({
+          browserRequestId: next.id,
+          url: probe.finalUrl,
+          destinationDir: next.destinationDir,
+          suggestedFileName: probe.suggestedFileName || next.fileName,
+          totalBytes: probe.totalBytes ?? 0,
+          supportsRanges: probe.supportsRanges && probe.totalBytes !== null,
+          interfaceIds: interfaces.map((iface) => iface.id),
+          etag: probe.etag,
+          lastModified: probe.lastModified
+        })
+        if (this.cancelledQueueIds.has(next.id)) await this.cancel(downloadId)
+        this.queuedDownloads = this.queuedDownloads.filter((entry) => entry.id !== next.id)
+        await this.saveQueuedDownloads()
+        this.publishQueue()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Download could not start.'
+        if (/already being started|already in progress/i.test(message)) return
+        if (this.queuedDownloads.some((entry) => entry.id === next.id)) {
+          next.error = message
+          await this.saveQueuedDownloads()
+          this.publishQueue()
+        }
+      }
+    } finally {
+      if (this.processingQueueId) this.cancelledQueueIds.delete(this.processingQueueId)
+      this.processingQueueId = null
+      this.processingQueue = false
+    }
   }
 
   private downloadsRoot(): string {
@@ -632,6 +818,42 @@ export class DownloadManager {
     if (!latest) return null
     const { blocks, ...state } = latest.state
     return structuredClone({ seq: latest.sentUpdates, state, blocks: blocks ?? latest.blocks })
+  }
+
+  /** Ask the themed renderer before starting an external browser-originated download. */
+  async confirmExternalDownload(fileName: string, details: string): Promise<boolean> {
+    const window = this.getWindow()
+    if (!window || window.isDestroyed()) return false
+    const contents = window.webContents
+    if (contents.isLoadingMainFrame()) {
+      await new Promise<void>((resolve) => {
+        const done = (): void => {
+          clearTimeout(timer)
+          contents.removeListener('did-finish-load', done)
+          contents.removeListener('destroyed', done)
+          resolve()
+        }
+        const timer = setTimeout(done, 10000)
+        contents.once('did-finish-load', done)
+        contents.once('destroyed', done)
+      })
+    }
+    if (window.isDestroyed() || contents.isDestroyed()) return false
+    const requestId = randomUUID()
+    return new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => this.resolveDownloadConfirmation(requestId, false), 5 * 60_000)
+      this.downloadConfirmations.set(requestId, { resolve, timer })
+      const request: DownloadConfirmationRequest = { requestId, fileName, details }
+      contents.send(IpcChannels.downloadConfirmation, request)
+    })
+  }
+
+  resolveDownloadConfirmation(requestId: string, accepted: boolean): void {
+    const pending = this.downloadConfirmations.get(requestId)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.downloadConfirmations.delete(requestId)
+    pending.resolve(accepted)
   }
 
   /** Plexo shows one download at a time (see useAppStore's currentDownload) — starting a second

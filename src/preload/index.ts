@@ -3,9 +3,11 @@ import { IpcChannels } from '../shared/ipc-channels'
 import type { IpcContract } from '../shared/ipc-contract'
 import type {
   AppSettings,
+  DownloadConfirmationRequest,
   DownloadUpdate,
   InitialState,
-  NetworkInterfaceInfo
+  NetworkInterfaceInfo,
+  QueuedDownload
 } from '../shared/types'
 
 /** Typed wrapper around ipcRenderer.invoke — the channel name picks its args/result shape out of
@@ -33,6 +35,12 @@ const plexoApi = {
   readClipboardText: () => invoke('readClipboardText'),
   revealInFolder: (filePath: string) => invoke('revealInFolder', filePath),
   openFile: (filePath: string) => invoke('openFile', filePath),
+  respondDownloadConfirmation: (requestId: string, accepted: boolean) =>
+    invoke('respondDownloadConfirmation', requestId, accepted),
+  getQueuedDownloads: () => invoke('getQueuedDownloads'),
+  queueDownloads: (urls: string[], destinationDir: string, scheduledAt: number | null) =>
+    invoke('queueDownloads', urls, destinationDir, scheduledAt),
+  cancelQueuedDownload: (id: string) => invoke('cancelQueuedDownload', id),
   startDownload: (request: IpcContract['startDownload']['args'][0]) =>
     invoke('startDownload', request),
   getCurrentDownload: () => invoke('getCurrentDownload'),
@@ -48,6 +56,21 @@ const plexoApi = {
     const listener = (_event: IpcRendererEvent, update: DownloadUpdate): void => callback(update)
     ipcRenderer.on(IpcChannels.downloadUpdated, listener)
     return () => ipcRenderer.removeListener(IpcChannels.downloadUpdated, listener)
+  },
+
+  onDownloadConfirmation: (
+    callback: (request: DownloadConfirmationRequest) => void
+  ): (() => void) => {
+    const listener = (_event: IpcRendererEvent, request: DownloadConfirmationRequest): void =>
+      callback(request)
+    ipcRenderer.on(IpcChannels.downloadConfirmation, listener)
+    return () => ipcRenderer.removeListener(IpcChannels.downloadConfirmation, listener)
+  },
+
+  onDownloadQueueChanged: (callback: (queue: QueuedDownload[]) => void): (() => void) => {
+    const listener = (_event: IpcRendererEvent, queue: QueuedDownload[]): void => callback(queue)
+    ipcRenderer.on(IpcChannels.downloadQueueChanged, listener)
+    return () => ipcRenderer.removeListener(IpcChannels.downloadQueueChanged, listener)
   },
 
   onNetworksChanged: (callback: (networks: NetworkInterfaceInfo[]) => void): (() => void) => {

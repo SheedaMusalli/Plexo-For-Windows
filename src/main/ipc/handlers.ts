@@ -158,6 +158,22 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
     if (error) throw new Error(error)
   })
 
+  handle('respondDownloadConfirmation', (event, requestId, accepted) => {
+    const window = getWindow()
+    if (!window || event.sender !== window.webContents) {
+      throw new Error('Download confirmation came from an untrusted renderer.')
+    }
+    manager.resolveDownloadConfirmation(requestId, accepted)
+  })
+
+  handle('getQueuedDownloads', async () => manager.getQueuedDownloads())
+
+  handle('queueDownloads', async (_event, urls, destinationDir, scheduledAt) =>
+    manager.queueDownloads(urls, destinationDir, scheduledAt)
+  )
+
+  handle('cancelQueuedDownload', async (_event, id) => manager.cancelQueuedDownload(id))
+
   handle('startDownload', async (_event, request) => manager.start(request))
 
   handle('getCurrentDownload', async () => manager.getCurrentDownload())

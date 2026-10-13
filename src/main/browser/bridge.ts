@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:net'
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { app, dialog, safeStorage, type BrowserWindow } from 'electron'
+import { app, safeStorage } from 'electron'
 import type { DownloadManager } from '../download/downloadManager'
 import { probeUrl } from '../download/probe'
 import { listActiveInterfaces } from '../network/interfaces'
@@ -39,26 +39,12 @@ async function checkFile(url: string, context: BrowserContext): Promise<ProbeRes
 /** A local named pipe, never an HTTP server accessible to websites. */
 export async function startBrowserBridge(
   manager: DownloadManager,
-  show: () => void,
-  getWindow: () => BrowserWindow | null
+  show: () => void
 ): Promise<Server> {
   const confirmDownload = async (fileName: string, details: string): Promise<boolean> => {
     if (testKnobs.userDataDir) return true
     show()
-    const options = {
-      type: 'question' as const,
-      buttons: ['Download', 'Cancel'],
-      defaultId: 1,
-      cancelId: 1,
-      title: 'Download with Plexo?',
-      message: `Do you want to download “${fileName}”?`,
-      detail: details
-    }
-    const window = getWindow()
-    const result = window
-      ? await dialog.showMessageBox(window, options)
-      : await dialog.showMessageBox(options)
-    return result.response === 0
+    return manager.confirmExternalDownload(fileName, details)
   }
   const youtube = new YoutubeDownloads(manager, show, confirmDownload)
   const suffix =
