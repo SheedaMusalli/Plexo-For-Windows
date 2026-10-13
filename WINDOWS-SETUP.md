@@ -1,10 +1,10 @@
 # Plexo for Windows + Chrome
 
-Custom build: **1.0.0-browser.6**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
+Custom build: **1.0.0-browser.7**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
 
 ## Update an existing installation
 
-Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.0** and app version **1.0.0-browser.6**.
+Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.0** and app version **1.0.0-browser.7**.
 
 ## YouTube
 
@@ -12,7 +12,7 @@ A small **Download this video** button appears at the top-right of the player. C
 
 Video and audio are combined with bundled FFmpeg when necessary; the resulting container may be MP4, WebM or MKV. Different qualities have distinct filenames. Page navigation and full-screen mode reposition the control. Disabling page buttons or excluding youtube.com hides it.
 
-This build uses yt-dlp and Deno to resolve formats for public YouTube videos. The menu can retry a bot check with cookies from the current browser only after you choose “Retry ... with YouTube sign-in.” Plexo passes YouTube cookies to its local helper for that metadata request, keeps them in memory, writes a temporary cookie file, and removes it when the request ends. Abandoned temporary files are cleaned the next time Plexo starts. Cookies are never copied to a media stream host or kept in the download queue. This does not bypass DRM or interactive challenges, or download live broadcasts. Private/sign-in-required or unavailable videos may fail with an error in the menu. Active YouTube jobs stop when you quit Plexo; their job history is not persisted across app restarts. Reopen the same video while Plexo is running to reconnect to an active job. Partial temporary files are removed when a job ends.
+This build uses yt-dlp and Deno to resolve formats for public YouTube videos. The menu can retry a bot check with cookies from the current browser only after you choose “Retry ... with YouTube sign-in.” Plexo passes YouTube cookies and the matching browser User-Agent to its local helper for that metadata request, keeps cookies in memory, writes a temporary cookie file, and removes it when the request ends. Abandoned temporary files are cleaned the next time Plexo starts. Cookies are never copied to a media stream host or kept in the download queue. YouTube may still reject expired cookies or block the network; repeated authenticated retries may put the account at risk. This does not bypass DRM or interactive challenges, or download live broadcasts. Private/sign-in-required or unavailable videos may fail with an error in the menu. Active YouTube jobs stop when you quit Plexo; their job history is not persisted across app restarts. Reopen the same video while Plexo is running to reconnect to an active job. Partial temporary files are removed when a job ends.
 
 ## Install
 

@@ -11,7 +11,7 @@
     #toggle{font-size:11px;padding:4px 7px;box-shadow:0 2px 7px #0007;background:#203749eF;white-space:nowrap}
     #panel{position:absolute;right:0;top:30px;width:290px;max-width:calc(100vw - 24px);max-height:60vh;overflow:auto;border:1px solid #526374;background:#17232f;border-radius:8px;box-shadow:0 5px 24px #0009;padding:11px}
     .top{display:flex;gap:8px;align-items:center}strong{flex:1;overflow-wrap:anywhere}#close{border:0;background:transparent;padding:0 4px;font-size:17px}.choice{display:block;width:100%;text-align:left;margin:5px 0}#status{margin:9px 0;font-size:11px;color:#c6d6e6;overflow-wrap:anywhere;white-space:normal}#retry,#cancel{margin-top:4px}.privacy{font-size:10px;color:#b5c4d3;line-height:1.35}
-  </style><button id="toggle" aria-expanded="false" title="Download this YouTube video with Plexo">↓ Download this video</button><section id="panel" hidden aria-label="YouTube download qualities"><div class="top"><strong id="title">Download with Plexo</strong><button id="close" aria-label="Close">×</button></div><div id="status" role="status"></div><div id="choices"></div><p class="privacy" id="cookie-note" hidden>Only for this retry, Plexo sends cookies for youtube.com to the local download app. The app deletes its temporary cookie file when the request ends.</p><button id="retry" hidden>Try again</button><button id="cancel" hidden>Cancel download</button></section>`
+  </style><button id="toggle" aria-expanded="false" title="Download this YouTube video with Plexo">↓ Download this video</button><section id="panel" hidden aria-label="YouTube download qualities"><div class="top"><strong id="title">Download with Plexo</strong><button id="close" aria-label="Close">×</button></div><div id="status" role="status"></div><div id="choices"></div><p class="privacy" id="cookie-note" hidden>Only for this retry, Plexo sends YouTube cookies and this browser's User-Agent to the local app. The app deletes its temporary cookie file when the request ends.</p><button id="retry" hidden>Try again</button><button id="cancel" hidden>Cancel download</button></section>`
   const $ = (id) => shadow.getElementById(id)
   let url = '',
     job = null,
@@ -21,7 +21,8 @@
     polling = false,
     generation = 0,
     signature = ''
-  const send = (message) => chrome.runtime.sendMessage(message)
+  const send = (message) =>
+    chrome.runtime.sendMessage({ ...message, userAgent: navigator.userAgent })
   function currentUrl() {
     const current = new URL(location.href)
     const id =

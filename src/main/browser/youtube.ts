@@ -358,11 +358,18 @@ export class YoutubeDownloads {
     if ([...this.jobs.values()].some((other) => other.state === 'downloading'))
       throw new Error('Finish or cancel the current YouTube download first.')
     const cookies = withCookies ? validCookies(message.cookies) : []
+    const userAgent =
+      withCookies &&
+      typeof message.userAgent === 'string' &&
+      message.userAgent.length <= 512 &&
+      message.userAgent.startsWith('Mozilla/5.0 ')
+        ? message.userAgent
+        : undefined
     job.state = 'downloading'
     job.message = 'Starting download…'
     job.startedAt = Date.now()
     job.lastProgressAt = job.startedAt
-    void this.download(job, choice, cookies)
+    void this.download(job, choice, cookies, userAgent)
     return this.view(job)
   }
 
@@ -422,11 +429,17 @@ export class YoutubeDownloads {
     }
   }
 
-  private async extractInfo(job: Job, cookies: YouTubeCookie[] = []): Promise<VideoInfo> {
+  private async extractInfo(
+    job: Job,
+    cookies: YouTubeCookie[] = [],
+    userAgent?: string
+  ): Promise<VideoInfo> {
     let info: VideoInfo | undefined
+    const args = ['--dump-single-json', '--skip-download']
+    if (userAgent) args.push('--user-agent', userAgent)
     await this.run(
       job,
-      ['--dump-single-json', '--skip-download'],
+      args,
       120000,
       (value) => {
         try {
@@ -441,7 +454,12 @@ export class YoutubeDownloads {
     return info
   }
 
-  private async download(job: Job, choice: Choice, cookies: YouTubeCookie[]): Promise<void> {
+  private async download(
+    job: Job,
+    choice: Choice,
+    cookies: YouTubeCookie[],
+    userAgent?: string
+  ): Promise<void> {
     let temporaryFolder: string | undefined
     let reservedOutput: string | undefined
     const childJobs: string[] = []
@@ -450,7 +468,7 @@ export class YoutubeDownloads {
       await mkdir(folder, { recursive: true })
       if (this.isCancelled(job)) return
       // yt-dlp only resolves signed formats. It never transfers the media bytes.
-      const info = await this.extractInfo(job, cookies)
+      const info = await this.extractInfo(job, cookies, userAgent)
       const formats = (info.formats || []).filter(
         (format) => !format.has_drm && this.validMediaUrl(format.url)
       )
@@ -498,7 +516,15 @@ export class YoutubeDownloads {
       if (job.path) this.manager.notifyExternalCompletion(job.path.split(/[\\/]/).pop() || job.path)
     } catch (error) {
       if (reservedOutput) await rm(reservedOutput, { force: true }).catch(() => {})
-      this.fail(job, error)
+      const reason = error instanceof Error ? error.message : String(error)
+      if (cookies.length && /sign in|not a bot|cookies-from-browser/i.test(reason))
+        this.fail(
+          job,
+          new Error(
+            'YouTube rejected this browser session even with its cookies and browser identity. Sign in to YouTube in this browser, refresh the video page, and retry once. If it still fails, YouTube may have expired the cookies or blocked this network; repeated retries may put the account at risk.'
+          )
+        )
+      else this.fail(job, error)
     } finally {
       for (const id of childJobs) await this.manager.remove(id).catch(() => {})
       job.activeDownloadId = undefined

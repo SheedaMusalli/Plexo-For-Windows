@@ -17,6 +17,11 @@ Original baseline: Plexo 1.0.0-browser.1, Windows x64.
 - FFmpeg's bundled build includes `libx264`; the Windows x64 installer, Chrome ZIP, and CRX3 rebuilt successfully with the existing extension ID.
 - No automated or live YouTube download test was run for this revision.
 
+## YouTube sign-in retry diagnostics: 1.0.0-browser.7
+
+- The explicit sign-in retry passes the active browser's User-Agent with its YouTube cookies and checks for common signed-in session cookies before sending the retry.
+- If YouTube still rejects that session, Plexo explains that cookies may be expired or the network may be blocked instead of showing only the generic bot-check error.
+
 ## Previous YouTube and page-button update: 1.0.0-browser.3 / extension 1.2.0
 
 - Final update checks: **4 browser integration tests passed** (52.1 seconds), **3 backend tests passed**, TypeScript and ESLint passed, Windows installer rebuilt, CRX3 signature verified, packaged media/extension files verified against tested files.
