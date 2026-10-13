@@ -7,7 +7,7 @@ import { makeDirs, PlexoApp } from './fixtures'
 import { createBrowserHost } from './browserHost'
 
 test.skip(process.platform !== 'win32', 'Windows integration')
-test('visible buttons, dynamic links, network media, 403 fallback, and unsupported streams', async () => {
+test('no floating button, direct media controls, capture fallback, and unsupported streams', async () => {
   test.setTimeout(90000)
   const root = resolve(__dirname, '..'),
     { dirs, dispose } = await makeDirs()
@@ -25,9 +25,9 @@ test('visible buttons, dynamic links, network media, 403 fallback, and unsupport
       res.setHeader('Content-Type', 'text/html')
       const content =
         req.url === '/'
-          ? '<h1>File downloads</h1><p>Choose a file below. Plexo adds its own download controls.</p><a href="/alpha.zip" download>Download alpha.zip</a><p><a href="/browser-only.zip" download>Download browser-only.zip</a></p><script>setTimeout(()=>{const a=document.createElement("a");a.href="/beta.zip";a.textContent="Download beta.zip";document.body.append(a)},200)</script>'
+          ? '<h1>File downloads</h1><p>Choose a file below. Plexo does not add a floating browser button.</p><a href="/alpha.zip" download>Download alpha.zip</a><p><a href="/browser-only.zip" download>Download browser-only.zip</a></p><script>setTimeout(()=>{const a=document.createElement("a");a.href="/beta.zip";a.textContent="Download beta.zip";document.body.append(a)},200)</script>'
           : req.url === '/network'
-            ? '<h1>Direct media detection</h1><video controls width="560" height="300"></video><script>document.querySelector("video").src=URL.createObjectURL(new Blob(["x"],{type:"video/mp4"}));fetch("/media-endpoint")</script>'
+            ? '<h1>Direct media detection</h1><video controls width="560" height="300" src="/media-endpoint.mp4"></video><script>fetch("/media-endpoint.mp4")</script>'
             : req.url === '/post'
               ? '<form method="POST" action="/form-file"><button>Download form result</button></form>'
               : '<h1>Segmented stream</h1><video controls width="560" height="300" src="/stream.m3u8"></video><script>fetch("/chunk.m4s")</script>'
@@ -101,28 +101,8 @@ test('visible buttons, dynamic links, network media, 403 fallback, and unsupport
     const page = await browser.newPage()
     await page.goto(url)
     const dock = page.locator('#plexo-page-tools')
-    await expect(dock.locator('#toggle')).toBeVisible()
-    await dock.locator('#toggle').click()
-    await expect(dock.locator('.item').filter({ hasText: 'beta.zip' })).toBeVisible()
-    const alpha = dock
-      .locator('.item')
-      .filter({ hasText: 'alpha.zip' })
-      .getByRole('button', { name: 'Download', exact: true })
-    await alpha.evaluate((element: HTMLButtonElement) => element.click())
-    await page.waitForTimeout(250)
-    expect(await readdir(dirs.dest)).toHaveLength(0)
-    await alpha.click()
-    await expect(dock.locator('#message')).toContainText('Added to Plexo')
-    await expect
-      .poll(async () => {
-        try {
-          return (await readFile(join(dirs.dest, 'alpha.zip'))).equals(bytes)
-        } catch {
-          return false
-        }
-      })
-      .toBe(true)
-    await page.screenshot({ path: join(root, 'release/page-buttons-preview.png') })
+    await expect(dock.locator('#toggle')).toHaveCount(0)
+    await expect(dock.locator('#dock')).toHaveCount(0)
     const count = (await readdir(dirs.dest)).length
     // This site serves Chrome but deliberately rejects the standalone preflight.
     const browserDownload = page.waitForEvent('download')
@@ -144,16 +124,22 @@ test('visible buttons, dynamic links, network media, 403 fallback, and unsupport
     await page.goto(url + '/network')
     await expect(dock.locator('#media-tools button')).toBeVisible()
     await dock.locator('#media-tools button').click()
-    await expect(dock.locator('.item').filter({ hasText: 'media-endpoint' })).toBeVisible()
+    await expect(dock.locator('#media-tools button')).toContainText('Added to Plexo')
+    await expect
+      .poll(async () => {
+        try {
+          return (await readFile(join(dirs.dest, 'media-endpoint.mp4'))).equals(bytes)
+        } catch {
+          return false
+        }
+      })
+      .toBe(true)
     await page.goto(url + '/stream')
-    await expect(dock.locator('#media-tools button')).toBeVisible()
-    await dock.locator('#media-tools button').click()
-    await expect(dock.locator('#hint')).toContainText('segmented streams')
-    await expect(dock.locator('.item')).toHaveCount(0)
+    await expect(dock.locator('#media-tools button')).toBeHidden()
     const popup = await browser.newPage()
     await popup.goto(`chrome-extension://${new URL(worker.url()).hostname}/popup.html`)
     await popup.locator('#pageButtons').uncheck()
-    await expect(dock.locator('#dock')).toBeHidden({ timeout: 6000 })
+    await expect(dock.locator('#media-tools button')).toBeHidden({ timeout: 6000 })
   } finally {
     await browser?.close()
     if (app.alive) await app.quit()

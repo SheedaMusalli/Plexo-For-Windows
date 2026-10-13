@@ -25,7 +25,7 @@ export async function youtubeRequest(message, sender, native) {
   if (message.action === 'youtubeEnabled')
     return { ok: true, enabled: settings.pageButtons !== false && !excluded }
   if (settings.pageButtons === false || excluded)
-    throw new Error('Page buttons are disabled for this site.')
+    throw new Error('Media download buttons are disabled for this site.')
   // Re-read the tab: YouTube changes videos without creating a new document.
   const tab = await chrome.tabs.get(sender.tab.id)
   const url = videoUrl(tab.url)

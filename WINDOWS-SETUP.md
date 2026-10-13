@@ -1,16 +1,16 @@
 # Plexo for Windows + Chrome
 
-Custom build: **1.0.0-browser.8**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
+Custom build: **1.0.0-browser.9**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
 
 ## Update an existing installation
 
-Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.0** and app version **1.0.0-browser.8**.
+Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.1** and app version **1.0.0-browser.9**.
 
 ## YouTube
 
 A small **Download this video** button appears at the top-right of the player. Click it to list the available resolutions, then choose a video-with-audio quality or audio-only. Plexo uses yt-dlp only to find fresh YouTube stream URLs; Plexo's native multi-connection download manager transfers the media bytes and shows its normal network and speed progress in the desktop app. Plexo combines separate video/audio streams locally with FFmpeg. The extension menu shows job status and the saved path. After selecting a format, Plexo asks for confirmation before transferring media.
 
-Video and audio are combined with bundled FFmpeg when necessary; the resulting container may be MP4, WebM or MKV. Different qualities have distinct filenames. Page navigation and full-screen mode reposition the control. Disabling page buttons or excluding youtube.com hides it.
+Video and audio are combined with bundled FFmpeg when necessary; the resulting container may be MP4, WebM or MKV. Different qualities have distinct filenames. Page navigation and full-screen mode reposition the control. Disabling media buttons or excluding youtube.com hides it.
 
 This build uses yt-dlp and Deno to resolve formats for public YouTube videos. The menu can retry a bot check with cookies from the current browser only after you choose “Retry ... with YouTube sign-in.” Plexo passes YouTube cookies and the matching browser User-Agent to its local helper for that metadata request, keeps cookies in memory, writes a temporary cookie file, and removes it when the request ends. Abandoned temporary files are cleaned the next time Plexo starts. Cookies are never copied to a media stream host or kept in the download queue. YouTube may still reject expired cookies or block the network; repeated authenticated retries may put the account at risk. This does not bypass DRM or interactive challenges, or download live broadcasts. Private/sign-in-required or unavailable videos may fail with an error in the menu. Active YouTube jobs stop when you quit Plexo; their job history is not persisted across app restarts. Reopen the same video while Plexo is running to reconnect to an active job. Partial temporary files are removed when a job ends.
 
@@ -38,7 +38,7 @@ Chrome's official documentation: [alternative extension installation methods](ht
 - Several downloads form a persistent queue. Plexo downloads one file at a time, using its existing parallel-connection engine for each file.
 - View or remove waiting items in the extension. Pause, resume, cancel, or remove the current file in the desktop app. Completed downloads include **Open file** and **Show in folder** actions.
 - The queue stops behind a paused or failed current download. Resume it, or remove/cancel it in Plexo to continue. A waiting item whose link check fails shows its error in the extension and can be removed and sent again.
-- **Page buttons** show a compact control over media and a file menu on pages with downloadable links. Direct media served through network requests can also appear.
+- **Media buttons** appear beside directly downloadable audio and video players; Plexo no longer adds a floating button at the bottom of webpages. Direct media served through network requests can also appear.
 - **Find media** lists direct audio/video URLs visible in the current page's DOM. It does not extract segmented streaming services.
 - Add comma-separated hostnames under **Settings and setup** to exclude sites from automatic capture. An entry also covers its subdomains.
 - Closing the Windows window leaves Plexo running in the system tray. Double-click its tray icon to reopen it. Use **Quit Plexo** in the tray menu to exit; active downloads are paused for recovery.
