@@ -380,11 +380,14 @@ export function DownloadingScreen({ download }: { download: DownloadState }): Re
             <TooltipTrigger
               render={
                 <span className="shrink-0 whitespace-nowrap">
-                  Saving to {toDisplayPath(dirnameOf(download.destinationPath), homeDir)}
+                  {download.displayLocation ||
+                    `Saving to ${toDisplayPath(dirnameOf(download.destinationPath), homeDir)}`}
                 </span>
               }
             />
-            <TooltipContent>Saving to: {download.destinationPath}</TooltipContent>
+            <TooltipContent>
+              {download.displayLocation || `Saving to: ${download.destinationPath}`}
+            </TooltipContent>
           </Tooltip>
           <Dot shrink />
           <span className="shrink-0">Resumable</span>

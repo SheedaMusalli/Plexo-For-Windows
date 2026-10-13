@@ -716,8 +716,9 @@ export class DownloadManager {
       browserRequestId: requestPayload.browserRequestId,
       id,
       url: requestPayload.url,
-      fileName: basename(destinationPath),
+      fileName: requestPayload.displayFileName || basename(destinationPath),
       destinationPath,
+      displayLocation: requestPayload.displayLocation,
       totalBytes: requestPayload.totalBytes,
       bytesDownloaded: 0,
       speedBytesPerSec: 0,
@@ -1081,7 +1082,7 @@ export class DownloadManager {
         }
       )
       runtime.state.destinationPath = publishedPath
-      runtime.state.fileName = basename(publishedPath)
+      runtime.state.fileName = runtime.requestPayload.displayFileName || basename(publishedPath)
       runtime.state.status = 'completed'
       runtime.state.completedAt = Date.now()
       runtime.state.bytesDownloaded = runtime.state.totalBytes || runtime.state.bytesDownloaded
@@ -1410,6 +1411,52 @@ export class DownloadManager {
   /** One completion notification for a multi-step download after its final file is ready. */
   notifyExternalCompletion(fileName: string): void {
     this.notify('Download Complete', `${fileName} has finished downloading.`)
+  }
+
+  /** Replace the last temporary YouTube stream screen with the finished, merged media file. */
+  async publishMergedFile(downloadIds: string[], filePath: string, url: string): Promise<void> {
+    const transfers = downloadIds
+      .map((id) => this.runtimes.get(id))
+      .filter(
+        (runtime): runtime is DownloadRuntime =>
+          !!runtime && runtime.state.status === 'completed' && !runtime.removed
+      )
+    const visible = transfers.at(-1)
+    if (!visible) return
+    const file = await stat(filePath)
+    const networks = new Map<string, DownloadNetwork>()
+    for (const runtime of transfers) {
+      for (const network of runtime.state.networks) {
+        const existing = networks.get(network.id)
+        if (existing) {
+          existing.bytesDownloaded += network.bytesDownloaded
+          existing.retries += network.retries
+          existing.enabled ||= network.enabled
+        } else {
+          networks.set(network.id, structuredClone(network))
+        }
+      }
+    }
+    visible.state.url = url
+    visible.state.fileName = basename(filePath)
+    visible.state.destinationPath = filePath
+    visible.state.displayLocation = undefined
+    visible.state.totalBytes = file.size
+    visible.state.bytesDownloaded = file.size
+    visible.state.speedBytesPerSec = 0
+    visible.state.networks = [...networks.values()]
+    visible.state.startedAt = Math.min(...transfers.map((runtime) => runtime.state.startedAt))
+    visible.state.completedAt = Date.now()
+    visible.state.totalBlocks = transfers.reduce(
+      (total, runtime) => total + (runtime.state.totalBlocks ?? 0),
+      0
+    )
+    visible.state.blocks = []
+    visible.state.chunks = []
+    visible.state.peakStreams = Math.max(
+      ...transfers.map((runtime) => runtime.state.peakStreams ?? 0)
+    )
+    this.pushUpdate(visible, false)
   }
 
   // --- attempts ---------------------------------------------------------------------------------

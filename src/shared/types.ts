@@ -118,6 +118,8 @@ export interface DownloadState {
   url: string
   fileName: string
   destinationPath: string
+  /** Optional friendly location shown for transient internal transfers. */
+  displayLocation?: string
   /** 0 means the size could not be determined ahead of time. */
   totalBytes: number
   bytesDownloaded: number
@@ -206,6 +208,10 @@ export interface StartDownloadRequest {
   url: string
   destinationDir: string
   suggestedFileName: string
+  /** Optional user-facing name for a transfer whose temporary filename is internal. */
+  displayFileName?: string
+  /** Optional user-facing location while the transfer writes to a temporary directory. */
+  displayLocation?: string
   /** 0 means unknown. */
   totalBytes: number
   supportsRanges: boolean

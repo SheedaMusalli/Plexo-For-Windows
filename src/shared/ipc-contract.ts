@@ -21,6 +21,7 @@ export interface IpcContract {
   chooseDestinationFolder: { args: [defaultPath: string]; result: string | null }
   readClipboardText: { args: []; result: string }
   revealInFolder: { args: [filePath: string]; result: void }
+  openFile: { args: [filePath: string]; result: void }
   startDownload: { args: [request: StartDownloadRequest]; result: string }
   getCurrentDownload: { args: []; result: DownloadUpdate | null }
   pauseDownload: { args: [id: string]; result: void }

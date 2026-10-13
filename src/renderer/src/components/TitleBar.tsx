@@ -69,6 +69,9 @@ export function TitleBar({ status }: { status: TitleBarStatus }): React.JSX.Elem
           Offline
         </ColorBadge>
       )}
+      <div className="hidden font-mono text-[9px] text-muted-foreground sm:block">
+        Made by Sheeda Musalli
+      </div>
       <UpdateIndicator />
       <ThemeToggle />
     </div>

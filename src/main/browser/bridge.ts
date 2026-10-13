@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:net'
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { app, safeStorage } from 'electron'
+import { app, dialog, safeStorage, type BrowserWindow } from 'electron'
 import type { DownloadManager } from '../download/downloadManager'
 import { probeUrl } from '../download/probe'
 import { listActiveInterfaces } from '../network/interfaces'
@@ -39,9 +39,28 @@ async function checkFile(url: string, context: BrowserContext): Promise<ProbeRes
 /** A local named pipe, never an HTTP server accessible to websites. */
 export async function startBrowserBridge(
   manager: DownloadManager,
-  show: () => void
+  show: () => void,
+  getWindow: () => BrowserWindow | null
 ): Promise<Server> {
-  const youtube = new YoutubeDownloads(manager, show)
+  const confirmDownload = async (fileName: string, details: string): Promise<boolean> => {
+    if (testKnobs.userDataDir) return true
+    show()
+    const options = {
+      type: 'question' as const,
+      buttons: ['Download', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Download with Plexo?',
+      message: `Do you want to download “${fileName}”?`,
+      detail: details
+    }
+    const window = getWindow()
+    const result = window
+      ? await dialog.showMessageBox(window, options)
+      : await dialog.showMessageBox(options)
+    return result.response === 0
+  }
+  const youtube = new YoutubeDownloads(manager, show, confirmDownload)
   const suffix =
     testKnobs.browserPipe ||
     createHash('sha256').update(app.getPath('home').toLowerCase()).digest('hex').slice(0, 16)
@@ -114,7 +133,10 @@ export async function startBrowserBridge(
     }
     await save()
   }
-  async function dispatch(message: Record<string, unknown>): Promise<unknown> {
+  async function dispatch(
+    message: Record<string, unknown>,
+    isConnected: () => boolean
+  ): Promise<unknown> {
     if (String(message.action).startsWith('youtube')) return youtube.dispatch(message)
     if (message.action === 'status') {
       const current = await manager.getCurrentDownload()
@@ -175,6 +197,13 @@ export async function startBrowserBridge(
       entry.probe = await checkFile(entry.url, entry.context)
       entry.probedAt = Date.now()
     }
+    const displayName = entry.filename || entry.probe?.suggestedFileName || 'download'
+    const size = entry.probe?.totalBytes
+    if (
+      !(await confirmDownload(displayName, `From ${url.origin}${size ? ` · ${size} bytes` : ''}`))
+    )
+      return { ok: true, cancelled: true }
+    if (!isConnected()) return { ok: true, cancelled: true }
     entries.push(entry)
     try {
       await save()
@@ -187,7 +216,7 @@ export async function startBrowserBridge(
   }
   const server = createServer((socket) => {
     let buffer = Buffer.alloc(0)
-    socket.setTimeout(45_000, () => socket.destroy())
+    socket.setTimeout(5 * 60_000, () => socket.destroy())
     socket.on('error', () => {})
     socket.on('data', (chunk) => {
       buffer = Buffer.concat([buffer, chunk])
@@ -200,7 +229,10 @@ export async function startBrowserBridge(
       socket.pause()
       void serial(async () => {
         try {
-          return await dispatch(JSON.parse(buffer.subarray(0, end).toString('utf8')))
+          return await dispatch(
+            JSON.parse(buffer.subarray(0, end).toString('utf8')),
+            () => !socket.destroyed
+          )
         } catch (error) {
           return {
             ok: false,

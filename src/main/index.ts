@@ -125,10 +125,12 @@ app.whenReady().then(async () => {
     tray.on('double-click', showWindow)
   }
   if (process.platform === 'win32' && (!testKnobs.userDataDir || testKnobs.browserBridge)) {
-    browserBridge = await startBrowserBridge(downloadManager, showWindow).catch((error) => {
-      console.error('Browser bridge:', error)
-      return null
-    })
+    browserBridge = await startBrowserBridge(downloadManager, showWindow, () => mainWindow).catch(
+      (error) => {
+        console.error('Browser bridge:', error)
+        return null
+      }
+    )
   }
   if (testKnobs.hideWindow) app.dock?.hide()
 

@@ -1,14 +1,14 @@
 # Plexo for Windows + Chrome
 
-Custom build: **1.0.0-browser.7**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
+Custom build: **1.0.0-browser.8**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
 
 ## Update an existing installation
 
-Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.0** and app version **1.0.0-browser.7**.
+Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.0** and app version **1.0.0-browser.8**.
 
 ## YouTube
 
-A small **Download this video** button appears at the top-right of the player. Click it to list the available resolutions, then choose a video-with-audio quality or audio-only. Plexo uses yt-dlp only to find fresh YouTube stream URLs; Plexo's native multi-connection download manager transfers the media bytes and shows its normal network and speed progress in the desktop app. Plexo combines separate video/audio streams locally with FFmpeg. The extension menu shows job status and the saved path.
+A small **Download this video** button appears at the top-right of the player. Click it to list the available resolutions, then choose a video-with-audio quality or audio-only. Plexo uses yt-dlp only to find fresh YouTube stream URLs; Plexo's native multi-connection download manager transfers the media bytes and shows its normal network and speed progress in the desktop app. Plexo combines separate video/audio streams locally with FFmpeg. The extension menu shows job status and the saved path. After selecting a format, Plexo asks for confirmation before transferring media.
 
 Video and audio are combined with bundled FFmpeg when necessary; the resulting container may be MP4, WebM or MKV. Different qualities have distinct filenames. Page navigation and full-screen mode reposition the control. Disabling page buttons or excluding youtube.com hides it.
 
@@ -20,7 +20,7 @@ This build uses yt-dlp and Deno to resolve formats for public YouTube videos. Th
 2. Extract **Plexo-Chrome.zip** into a permanent folder.
 3. Open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
 4. Pin **Plexo Download Manager** using Chrome's Extensions button. Open its popup; it should say **Connected**. Opening the popup can start Plexo automatically.
-5. Download a file normally, or right-click a direct link and select **Download with Plexo**.
+5. Download a file normally, or right-click a direct link and select **Download with Plexo**. Plexo asks before adding the browser download to its queue; YouTube asks after you choose a format and before any media bytes transfer.
 
 The installer also includes an extension copy at `<installation folder>\resources\extension`; you can load that folder instead of extracting the ZIP. Keep the folder you loaded: Chrome needs it on future launches.
 
@@ -36,14 +36,14 @@ Chrome's official documentation: [alternative extension installation methods](ht
 
 - **Automatic capture** is enabled initially. Toggle it in the extension to keep downloads in Chrome.
 - Several downloads form a persistent queue. Plexo downloads one file at a time, using its existing parallel-connection engine for each file.
-- View or remove waiting items in the extension. Pause, resume, cancel, or remove the current file in the desktop app.
+- View or remove waiting items in the extension. Pause, resume, cancel, or remove the current file in the desktop app. Completed downloads include **Open file** and **Show in folder** actions.
 - The queue stops behind a paused or failed current download. Resume it, or remove/cancel it in Plexo to continue. A waiting item whose link check fails shows its error in the extension and can be removed and sent again.
 - **Page buttons** show a compact control over media and a file menu on pages with downloadable links. Direct media served through network requests can also appear.
 - **Find media** lists direct audio/video URLs visible in the current page's DOM. It does not extract segmented streaming services.
 - Add comma-separated hostnames under **Settings and setup** to exclude sites from automatic capture. An entry also covers its subdomains.
 - Closing the Windows window leaves Plexo running in the system tray. Double-click its tray icon to reopen it. Use **Quit Plexo** in the tray menu to exit; active downloads are paused for recovery.
 - Downloads use the folder selected in Plexo, or the Windows Downloads folder by default.
-- The app checks the response before accepting a captured download. If the server returns 403 or a challenge page, or the app cannot accept it, the extension resumes the original Chrome download. After Plexo has accepted it into its encrypted queue, subsequent server failures are shown in Plexo or the extension rather than silently downloading a second copy in Chrome.
+- The app asks before accepting a captured download into its queue and checks the response first. If the server returns 403 or a challenge page, or the app cannot accept it, the extension resumes the original Chrome download. After Plexo has accepted it into its encrypted queue, subsequent server failures are shown in Plexo or the extension rather than silently downloading a second copy in Chrome.
 
 ## Compatibility
 

@@ -1,4 +1,5 @@
 import type { DownloadState } from '@shared/types'
+import { useState } from 'react'
 import { HeroBand } from '../components/HeroBand'
 import { ScreenFooter } from '../components/ScreenFooter'
 import { ThroughputChart } from '../components/ThroughputChart'
@@ -21,6 +22,7 @@ export function CompleteScreen({
   const peakSpeedBytesPerSec = useAppStore((store) => store.peakSpeedBytesPerSec)
   const speedHistoryByInterface = useAppStore((store) => store.speedHistoryByInterface)
   const networkVisual = useNetworkVisuals()
+  const [openError, setOpenError] = useState<string | null>(null)
 
   const finalSize = download.totalBytes || download.bytesDownloaded
   const totalPausedMs = download.totalPausedMs ?? 0
@@ -42,6 +44,14 @@ export function CompleteScreen({
   const totalChunkCount = download.totalBlocks ?? download.blocks?.length ?? 1
 
   const handleReveal = (): void => void window.plexo.revealInFolder(download.destinationPath)
+  const handleOpen = async (): Promise<void> => {
+    setOpenError(null)
+    try {
+      await window.plexo.openFile(download.destinationPath)
+    } catch (error) {
+      setOpenError(error instanceof Error ? error.message : 'Plexo could not open the file.')
+    }
+  }
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -151,6 +161,11 @@ export function CompleteScreen({
       </div>
 
       <ScreenFooter>
+        {openError && (
+          <div role="alert" className="max-w-[150px] truncate text-[11px] text-destructive">
+            {openError}
+          </div>
+        )}
         <div className="shrink-0 font-mono text-[11px] leading-[1.4] whitespace-nowrap text-muted-foreground">
           {`written in ${totalChunkCount} chunks · ${totalRetries} ${
             totalRetries === 1 ? 'retry' : 'retries'
@@ -159,6 +174,9 @@ export function CompleteScreen({
         <div className="flex-1" />
         <Button type="button" variant="secondary" onClick={onNewDownload}>
           New Download
+        </Button>
+        <Button type="button" variant="secondary" onClick={() => void handleOpen()}>
+          Open file
         </Button>
         <Button type="button" onClick={handleReveal}>
           {window.plexo.platform === 'darwin' ? 'Reveal in Finder' : 'Show in folder'}

@@ -99,7 +99,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
   void makeDownload(info.linkUrl || info.srcUrl, '', info.pageUrl)
     .then(native)
-    .then(() => report('Added to Plexo’s download queue.'))
+    .then((result) => {
+      if (!result.cancelled) return report('Added to Plexo’s download queue.')
+    })
     .catch((error) => report(error.message, true))
 })
 
@@ -141,7 +143,7 @@ async function capture(item) {
     paused = true
     const [latest] = await chrome.downloads.search({ id: item.id })
     if (!latest || latest.state !== 'in_progress') return
-    await native(
+    const result = await native(
       await makeDownload(
         url,
         latest.filename,
@@ -152,7 +154,7 @@ async function capture(item) {
     accepted = true
     await chrome.storage.local.set({ [key]: { id: item.id, time: Date.now(), accepted: true } })
     await chrome.downloads.cancel(item.id)
-    await report('Added to Plexo’s download queue.')
+    await report(result.cancelled ? 'Download cancelled.' : 'Added to Plexo’s download queue.')
   } catch (error) {
     if (paused && !accepted) await chrome.downloads.resume(item.id).catch(() => {})
     await report(

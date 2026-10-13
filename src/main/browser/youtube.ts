@@ -143,7 +143,8 @@ export class YoutubeDownloads {
 
   constructor(
     private readonly manager: DownloadManager,
-    private readonly show: () => void
+    private readonly show: () => void,
+    private readonly confirmDownload: (fileName: string, details: string) => Promise<boolean>
   ) {
     void this.removeAbandonedCookieFiles().catch(() => {})
     app.once('before-quit', () => {
@@ -475,18 +476,40 @@ export class YoutubeDownloads {
       const selected = this.selectFormats(formats, choice)
       if (!selected.video && !selected.audio)
         throw new Error('That YouTube quality is no longer available. Reopen the quality menu.')
+      const finalExtension = selected.video ? 'mp4' : selected.audio?.ext || 'm4a'
+      const finalFileName = `${this.safeStem(job.title)}.${finalExtension}`
+      job.message = 'Waiting for your confirmation…'
+      if (!(await this.confirmDownload(finalFileName, `YouTube · ${choice.label}`))) {
+        job.state = 'cancelled'
+        job.message = 'Download cancelled before any video data was transferred.'
+        return
+      }
       const settings = await loadSettings()
       const destination = settings.destinationDir || app.getPath('downloads')
       temporaryFolder = await mkdtemp(join(destination, `.plexo-youtube-${randomUUID()}-`))
       const names: string[] = []
       if (selected.video)
         names.push(
-          await this.downloadStream(job, selected.video, temporaryFolder, 'video', childJobs)
+          await this.downloadStream(
+            job,
+            selected.video,
+            temporaryFolder,
+            'video',
+            childJobs,
+            finalFileName
+          )
         )
       if (this.isCancelled(job)) return
       if (selected.audio)
         names.push(
-          await this.downloadStream(job, selected.audio, temporaryFolder, 'audio', childJobs)
+          await this.downloadStream(
+            job,
+            selected.audio,
+            temporaryFolder,
+            'audio',
+            childJobs,
+            finalFileName
+          )
         )
       if (job.state === 'cancelled') return
       if (selected.video && selected.audio) {
@@ -513,7 +536,10 @@ export class YoutubeDownloads {
       }
       job.state = 'complete'
       job.message = `Saved with Plexo${job.path ? ': ' + job.path : ' to your Plexo download folder'}`
-      if (job.path) this.manager.notifyExternalCompletion(job.path.split(/[\\/]/).pop() || job.path)
+      if (job.path) {
+        await this.manager.publishMergedFile(childJobs, job.path, job.url)
+        this.manager.notifyExternalCompletion(job.path.split(/[\\/]/).pop() || job.path)
+      }
     } catch (error) {
       if (reservedOutput) await rm(reservedOutput, { force: true }).catch(() => {})
       const reason = error instanceof Error ? error.message : String(error)
@@ -567,7 +593,8 @@ export class YoutubeDownloads {
     format: YoutubeFormat,
     folder: string,
     kind: string,
-    ids: string[]
+    ids: string[],
+    displayFileName: string
   ): Promise<string> {
     if (!format.url || !this.validMediaUrl(format.url))
       throw new Error('YouTube returned an unsupported media stream URL.')
@@ -583,6 +610,8 @@ export class YoutubeDownloads {
       url: url.href,
       destinationDir: folder,
       suggestedFileName: `${kind}.${(format.ext || 'bin').replace(/[^a-z0-9]/gi, '')}`,
+      displayFileName,
+      displayLocation: 'YouTube · preparing final file',
       totalBytes: probe.totalBytes ?? 0,
       supportsRanges: probe.supportsRanges,
       interfaceIds: (await listActiveInterfaces()).map((network) => network.id),

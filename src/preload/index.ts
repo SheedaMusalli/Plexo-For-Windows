@@ -32,6 +32,7 @@ const plexoApi = {
   chooseDestinationFolder: (defaultPath: string) => invoke('chooseDestinationFolder', defaultPath),
   readClipboardText: () => invoke('readClipboardText'),
   revealInFolder: (filePath: string) => invoke('revealInFolder', filePath),
+  openFile: (filePath: string) => invoke('openFile', filePath),
   startDownload: (request: IpcContract['startDownload']['args'][0]) =>
     invoke('startDownload', request),
   getCurrentDownload: () => invoke('getCurrentDownload'),

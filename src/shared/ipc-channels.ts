@@ -9,6 +9,7 @@ export const IpcChannels = {
   chooseDestinationFolder: 'dialog:choose-destination-folder',
   readClipboardText: 'clipboard:read-text',
   revealInFolder: 'shell:reveal-in-folder',
+  openFile: 'shell:open-file',
   startDownload: 'download:start',
   getCurrentDownload: 'download:get-current',
   pauseDownload: 'download:pause',

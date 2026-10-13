@@ -151,6 +151,13 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
     shell.showItemInFolder(filePath)
   })
 
+  handle('openFile', async (_event, filePath) => {
+    const info = await stat(filePath)
+    if (!info.isFile()) throw new Error('The download file is not available.')
+    const error = await shell.openPath(filePath)
+    if (error) throw new Error(error)
+  })
+
   handle('startDownload', async (_event, request) => manager.start(request))
 
   handle('getCurrentDownload', async () => manager.getCurrentDownload())
