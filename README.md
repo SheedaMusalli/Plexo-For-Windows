@@ -1,403 +1,100 @@
-> **Custom Windows + Chrome build:** see [WINDOWS-SETUP.md](WINDOWS-SETUP.md) for installation, browser integration, rebuild instructions, and limitations. See [VALIDATION.md](VALIDATION.md) for the test record.
+# Plexo Download Manager
 
-# Plexo
+[![Latest release](https://img.shields.io/github/v/release/SheedaMusalli/Plexo-For-Windows)](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=githubsponsors)](https://github.com/sponsors/anmolkapil)
+Plexo is a Windows download manager with a Chrome and Edge companion extension. It can split a supported download into parallel parts and route those requests through the network connections you select, then assemble them into one file.
 
-A fast download manager for Windows, macOS, and Linux that speeds up downloads by pulling chunks in parallel across **multiple network connections at the same time**.
+This repository contains the Windows x64 release and its source. Plexo is based on the original [Plexo project by Anmol Kapil](https://github.com/anmolkapil/plexo); its MIT license is included. This Windows build and its browser integration are maintained by Sheeda Musalli.
 
-For example, if your computer has:
+![Plexo download screen](docs/screenshots/links.png)
 
-- Wi-Fi
-- Ethernet
-- USB-tethered phone (iPhone or Android)
-- Cellular
+## Download Plexo
 
-Plexo can utilize all of them simultaneously to download the **same file**.
+Get the latest installer and companion extension from the [GitHub Releases page](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). The first public release includes:
 
-https://github.com/user-attachments/assets/e57728f4-fb63-441f-839c-174eef954b17
+- **Windows installer** — installs the Plexo desktop app and browser native-messaging helper.
+- **Chrome extension CRX and ZIP** — the ZIP is the recommended way to install this privately distributed extension.
+- **Source archive** and **SHA-256 checksums** for the release files.
 
----
+The installer is not Authenticode-signed with a publisher certificate, so Windows may show an unknown-publisher or SmartScreen warning. The CRX package signature does not mean the extension is published or approved by the Chrome Web Store.
 
-## ⚠️ Before you start
+## Install the desktop app and extension
 
-### Combining multiple network connections?
+1. Download and run the Plexo Windows installer.
+2. Download the `Plexo-Chrome-…zip` release asset and extract it to a folder you plan to keep.
+3. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge, turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
+4. Pin **Plexo Download Manager** from the browser’s Extensions menu. Open its popup and check that it says **Connected**.
+5. Use a supported direct download link or a direct media control on a page. Plexo asks before accepting a browser download and shows the transfer in the desktop app.
 
-To successfully combine bandwidth across multiple network adapters (on Windows, macOS, or Linux):
+Chromium browsers restrict installation of most extensions outside their official stores. If your browser refuses the CRX file, install the ZIP with **Load unpacked** as described above. Keep the extracted folder in place; the browser loads the extension from that folder.
 
-- **Use distinct internet connections:**
-  - Each connection must have its own gateway / subnet (e.g., **Wi-Fi** via home router + **USB Tethering** via mobile phone, or two distinct WAN networks).
-  - Connecting both Wi-Fi and Ethernet to the **same router** (same local subnet like `192.168.1.0/24`) will not increase speeds: both share the same upstream broadband connection, and operating system routing will send all packets through whichever interface has the lower metric or higher priority (usually Ethernet).
+## What Plexo does
 
-### Wi-Fi disconnecting when Ethernet is plugged in on Windows?
+- **Parallel downloads across selected networks.** Plexo can use separate Internet connections—such as home Wi-Fi and mobile tethering—to fetch parts of the same file. Servers that support HTTP range requests can use multiple streams; other servers fall back to a single stream.
+- **Adaptive transfer and recovery.** Workers share a queue of file ranges, retry temporary failures, and can pause and resume. An interrupted desktop download is restored as paused when Plexo starts again.
+- **Browser handoff.** The extension can capture supported direct downloads, offer a context-menu action for links, and show controls next to directly downloadable audio or video. The original browser download remains the fallback when Plexo cannot accept a link.
+- **YouTube format selection.** On supported YouTube pages, the extension can show available video qualities. Plexo downloads the selected media through its desktop transfer engine and combines video and audio when needed. The final video uses the video title as its filename.
+- **One-time scheduling and sequential batches.** Add one or more direct links in the desktop app, optionally choose a start time, and Plexo processes the batch in order. You can review and cancel queued items. Plexo must remain open and the PC must be awake when the scheduled time arrives.
+- **Transfer visibility.** See speed, progress, network contribution, and stream activity; open a finished file or reveal it in Explorer. Plexo also includes light and dark themes and network-name/color settings.
 
-Some Windows 10/11 installations automatically disconnect or sleep Wi-Fi when an active Ethernet cable is detected.
+![Plexo download progress](docs/screenshots/downloading.png)
 
-If Wi-Fi turns off when Ethernet is plugged in: open **Group Policy Editor** (`gpedit.msc`) → _Computer Configuration_ → _Administrative Templates_ → _Network_ → _Windows Connection Manager_ → set **"Minimize the number of simultaneous connections to the Internet or a Windows domain"** to **Disabled**.
+![Plexo completed download](docs/screenshots/complete.png)
 
-### Using Android USB tethering on macOS?
+## When multiple networks help
 
-macOS does not natively provide an RNDIS driver, so Android phones with USB tethering enabled won't appear as network interfaces out of the box (this is also why legacy kernel extensions like `HoRNDIS` stopped working on Apple Silicon and modern macOS).
+Plexo needs genuinely separate routes to the Internet to combine bandwidth. For example, Wi-Fi through a home router and USB-tethered mobile data can use different connections. Wi-Fi and Ethernet connected to the same router normally share one broadband connection, so selecting both will not make that broadband service faster.
 
-To use your Android phone's connection over USB, install **TetherKit** — a kext-free, user-space RNDIS driver.
+The result also depends on the download server. It may limit parallel requests, ignore range requests, or cap the total speed. Plexo cannot guarantee a speed increase for every file or network setup.
 
-See [Using a USB-tethered Android phone](#using-a-usb-tethered-android-phone) for setup instructions.
+## Compatibility and limitations
 
-> Plexo can only route traffic through connections that your operating system recognizes as network interfaces.
+Plexo is designed for direct HTTP or HTTPS file downloads. Support varies by site and link:
 
----
+- Sign-in pages, anti-bot challenges, expired links, and some cross-site authentication flows may need to stay in the browser.
+- DRM-protected media, HLS/DASH playlists, `blob:` and `data:` links, POST-generated downloads, and private browsing are not supported by the general browser handoff.
+- YouTube access depends on the video, region, and current account/session requirements. Some videos may fail to resolve or download.
+- A scheduled or queued URL can expire before Plexo reaches it.
+- This project does not provide full IDM/FDM compatibility with every website.
 
-## Why Plexo?
+For additional Windows setup, privacy, and troubleshooting details, see [WINDOWS-SETUP.md](WINDOWS-SETUP.md). The build and test record is in [VALIDATION.md](VALIDATION.md).
 
-A single TCP connection rarely saturates your actual bandwidth. Even when your computer has multiple active networks — such as Wi-Fi and a tethered mobile phone — the operating system routes all traffic through a single default gateway, leaving the other interfaces completely idle.
+## Privacy and permissions
 
-Plexo changes that: it splits the file into independent byte ranges and downloads them simultaneously through distinct physical network interfaces.
+The browser extension requests broad site access so it can detect supported downloads and direct media on pages. It uses Chrome Native Messaging to communicate with the locally installed Plexo helper; it does not add a web-accessible local HTTP server. Recent request headers can be used to preserve authentication for a matching download, and credentials in Plexo’s persisted browser queue are encrypted with Windows credential storage. Incognito requests are excluded.
 
-```text
-                    ┌── Wi-Fi (IP: 192.168.1.40) ──────┐
-                    │                                  │
-                    ├── Ethernet (IP: 10.0.0.12) ──────┤
-File ──→ Split ─────┤                                  ├──→ Assembled File
-                    ├── USB Tether (IP: 172.20.10.3) ──┤
-                    │                                  │
-                    └── Cellular (IP: 21.169.64.78) ───┘
-```
+YouTube sign-in cookies are only sent for the explicit YouTube retry that asks to use the current browser session. They are used for metadata resolution and are not stored in the download queue. See [WINDOWS-SETUP.md](WINDOWS-SETUP.md#privacy-and-local-storage) for the detailed data flow.
 
-**Multiple networks → concurrent HTTP range requests → aggregated bandwidth**
+## Build from source
 
----
+The published installer targets Windows x64. To build it yourself, use Windows 10 or 11, Node.js 22.12 or newer, npm, and Windows PowerShell. The Windows build also compiles the browser helper and prepares the media tools used by YouTube downloads.
 
-## Features
-
-- 🚀 **Multi-interface, multi-connection downloads** — splits files into chunks of up to 8 MB and fans them out across worker connections bound to specific network interfaces, each kept open from one chunk to the next. Each interface starts with 8 connections and doubles once they are all receiving, up to 32. If the server refuses some (503, 429, 403, or leaves them unanswered), that interface drops to the ones it accepted, then gets one more back each minute without a refusal; a server refusing everything (busy, or an expired link) doesn't lower it. You can also pick a fixed 4, 8, 16 or 32 per interface on the start screen instead of Auto.
-- 🔌 **Hardware interface detection** — queries Windows adapters via PowerShell `Get-NetAdapter` and macOS hardware ports via `networksetup` so Wi-Fi, Ethernet, tethered iPhones, and Thunderbolt bridges are labeled by real device names instead of bare BSD names (`en0`, `en6`).
-- ⚖️ **Dynamic work-stealing queue** — chunks are leased from a shared pending queue; faster networks pull more chunks instead of waiting for slower connections to finish.
-- ⏸️ **Resumable downloads** — cleanly pause and resume downloads with progress saved in a destination-side staging file.
-- 💾 **Relaunch recovery** — interrupted downloads are restored as paused after Plexo restarts, with a small manifest in application data.
-- 🛡️ **Safe, integrity-checked resume** — re-verifies remote `ETag` and `Last-Modified` validators before resuming, refusing to resume (rather than corrupting the file) if the server-side file has changed.
-- 🔁 **Automatic retry with backoff** — failed chunks go back to the queue and are retried with jittered exponential backoff (1s–15s). A dropped connection is retried for as long as its network is there; a busy server (429, 503, …) is waited out, honouring `Retry-After`; a server that answers wrongly gets 5 retries.
-- 🔄 **Network changes and sleep** — a network that gets a new address, or a computer that wakes from sleep, gets its connections going again at once instead of waiting out a backoff; the computer is kept awake while a download runs.
-- 💤 **Stall detection & watchdog** — automatically drops and re-queues connections that remain open but silent (>20s without incoming data, not counting time spent waiting on the disk).
-- 🔔 **Desktop notifications** — native desktop alerts when downloads complete or encounter errors.
-- 💾 **Upfront disk-space verification** — checks the destination volume before writing the staging file.
-- 🔀 **Mid-download redirect handling** — transparently follows 3xx HTTP redirects (up to 5 hops) during probing and individual chunk downloads.
-- 📊 **Real-time telemetry** — live throughput graphs, rolling-window ETA calculation, and per-connection transfer stats.
-- 🗺️ **Interactive progress grid** — 1:1 visual map of individual chunks, color-coded by the network interface that fetched each chunk with accurate per-network byte attribution.
-- 🎨 **Network customization** — rename and recolor physical network interfaces with persistent user preferences.
-- 🌓 **Light & Dark modes** — full theme support with an instant toggle between light and dark modes.
-
----
-
-# How it works
-
-Instead of downloading a file linearly over a single socket, Plexo requests arbitrary slices of the file simultaneously across multiple physical network interfaces. Three core technical primitives make this work:
-
-### 1. HTTP range requests (`206 Partial Content`)
-
-Most modern HTTP servers support byte-level slicing:
-
-```http
-GET /ubuntu-26.04.1-desktop-amd64.iso HTTP/1.1
-Host: releases.ubuntu.com
-Range: bytes=8388608-16777215
-```
-
-Servers advertise this capability with the `Accept-Ranges: bytes` response header and reply with HTTP status `206 Partial Content`. Because byte slices are stateless and independent, Plexo can request dozens of chunks at once, in any order, and stitch them together later.
-
-#### Probing before downloading
-
-Before starting a multi-connection download, Plexo sends a **1-byte ranged GET** (`Range: bytes=0-0`), following any redirects:
-
-- Unlike a `HEAD` request (which servers and CDNs frequently misreport), receiving a `206 Partial Content` response conclusively proves that range requests are supported and functional.
-- The probe response provides the total file size (`Content-Range` / `Content-Length`), suggested filename (`Content-Disposition`), and cache validators (`ETag` and `Last-Modified`).
-- If the server answers with `200 OK` (ignoring the `Range` header), Plexo falls back to a standard single-connection stream instead of failing.
-
-### 2. Multi-interface socket binding
-
-Every active network interface on your computer has local IP addresses — Wi-Fi might have both IPv4 and IPv6, while a USB-tethered phone has its own addresses.
-
-A standard TCP socket leaves interface selection to the operating system's routing table. Plexo resolves the server, chooses an address of the same IP family on each selected interface, then binds that address for its HTTP/HTTPS connections. On Linux it also pins the socket to the device.
-
-```js
-https.request({
-  hostname: 'releases.ubuntu.com',
-  path: '/ubuntu-26.04.1-desktop-amd64.iso',
-  localAddress: '172.20.10.3', // Source address on the USB tether
-  headers: {
-    Range: 'bytes=8388608-16777215'
-  }
-})
-```
-
-The interface binding keeps each worker on its selected network:
-
-- **No virtual network adapters or VPN tunnels**
-- **No packet bonding or link aggregation**
-- **No kernel extensions (`kext`) or root privileges**
-
-### 3. Dynamic work-stealing queue
-
-If you statically divide a 6 GB file into equal shares (e.g. 3 GB on Wi-Fi and 3 GB on mobile data), the total download speed is bottlenecked by the slower network.
-
-Instead, Plexo uses a **dynamic work-stealing queue**:
-
-1. The file is split into **chunks of up to 8 MB** (smaller for small files, so every network gets a share).
-2. All chunks enter a centralized pending queue.
-3. A pool of worker connections continuously lease the next chunk from the queue as soon as they become free. Each keeps its one connection to the server from chunk to chunk, so it pays for the handshake and TCP's slow start once, not per chunk. Connections start interleaved across networks, so each network is served before any is served twice.
-   - **How many.** Each network starts with 8 connections, and once every one of them is receiving it doubles, up to 32, never more than there are chunks for. Another connection costs little when the link is already full, and a server that caps each connection's speed is only outrun by more of them. A server that refuses some of a network's connections (503, 429, 403, or leaves them unanswered for 5 seconds) while still sending data down the others is asking for fewer: the refused ones close, their chunks go back to the queue to carry on from where they got to, and that network stays at the ones left. After a minute without another refusal it may have one more, and so on back up. A server that refuses everything (busy, or an expired link) isn't limiting connections, so the count stays. On the start screen you can pick a fixed 4, 8, 16 or 32 per network instead of Auto.
-4. Faster interfaces finish chunks quicker and immediately pick up new ones; slower interfaces pull fewer chunks.
-5. **Racing the tail.** Once no chunk is left waiting, a free connection can start a second attempt at a chunk another connection is fetching too slowly (as soon as the free connection would finish it in under half the time the chunk still needs; a chunk whose second attempt is stuck too can get one more), picking up from where the first had got to. Whichever finishes first wins and the other is dropped. It costs a few bytes fetched twice at the very end, and it means one slow connection — or one slow network — can no longer hold the whole download back. A stream doing this is marked **BACKUP** in the streams table.
-
-```text
-Shared Pending Queue: [Chunk #4]  [Chunk #5]  [Chunk #6]  [Chunk #7]  [Chunk #8]  ...
-                          ↑           ↑           ↑           ↑
-                       Worker 1    Worker 2    Worker 3    Worker 4
-                       (Wi-Fi)    (Ethernet) (USB Tether) (Cellular)
-```
-
-Work distribution is dynamically proportional to each interface's real-time throughput. If one network slows down or disconnects, remaining workers continue draining the queue without stalled shares.
-
-### 4. Direct-to-destination storage
-
-Each worker writes its assigned byte range at its final offset in one staging file beside the chosen destination. Workers use separate file handles and explicit byte positions, so non-overlapping ranges can be written in parallel.
-
-While downloading, the folder contains `<filename>.plexo` and no empty file under the final name. Once every range is complete, Plexo flushes the partial file, checks for a filename collision, and renames it into place in the same folder. If the final name is taken, Plexo chooses a numbered name. This works on drives such as exFAT without a full-file assembly copy, so the destination needs approximately one file's worth of space.
-
----
-
-# Downloads are resumable
-
-When you pause a download:
-
-- Plexo aborts all active HTTP socket connections via `AbortController`.
-- The staging file remains beside the chosen destination, and progress is saved in a small manifest.
-
-When you resume:
-
-1. **Validator check**: Plexo sends a probe request to compare the server's current `ETag` and `Last-Modified` headers against the values recorded when the download started.
-2. **Safe resume**: If the validators match, Plexo resumes each range from the last saved byte offset in the staging file.
-3. **Guard against corruption**: If the file on the server has changed, Plexo refuses to resume to prevent combining incompatible slices into a corrupt file.
-
-Download manifests are stored under Plexo's application-data directory; large partial data stays beside the destination. If Plexo quits or crashes during a transfer, it restores that transfer as paused on the next launch. Cancelling or removing a download deletes its staging file.
-
----
-
-# What is a chunk?
-
-A **chunk** is the atomic unit of work in Plexo:
-
-- **Size**: Up to 8 MB, with the final chunk sized to the remaining bytes. A file that is small next to its connection count gets smaller chunks (never under 1 MB) — at least two per connection — so a fast network can out-pull a slow one instead of being stuck behind it.
-- **Transport**: One independent HTTP range request (`Range: bytes=START-END`).
-- **Storage**: Written at its final byte offset in the destination-side staging file.
-- **Assignment**: Leased to an individual worker socket bound to a specific network interface.
-
-```text
-Chunk #0 → Range: bytes=0-8388607         → staging offset 0 (Wi-Fi)
-Chunk #1 → Range: bytes=8388608-16777215  → staging offset 8388608 (Ethernet)
-Chunk #2 → Range: bytes=16777216-25165823 → staging offset 16777216 (USB Tether)
-Chunk #3 → Range: bytes=25165824-33554431 → staging offset 25165824 (Cellular)
-```
-
-### Why up to 8 MB?
-
-8 MB provides the optimal balance: large enough to minimize HTTP connection overhead and TLS handshakes, yet small enough to keep the work-stealing queue fluid, ensure fine-grained load balancing across mismatched connections, and keep retries cheap (a failed or stalled connection only discards at most 8 MB). Below about 1 MB a request costs more in round trips than splitting saves, so that is the floor; a file that small is one chunk.
-
----
-
-# What is the progress grid?
-
-The progress grid provides a real-time visual map of the entire download.
-
-Every chunk maps **1:1 to its own square** in the grid. Square #N directly corresponds to the **Chunk #N** badge shown in the active streams table, allowing you to cross-reference active connections with their location in the file.
-
-```text
-Active Streams:
-[Wi-Fi]      → Chunk #4
-[Ethernet]   → Chunk #5
-[USB Tether] → Chunk #6
-[Cellular]   → Chunk #7
-
-Progress Grid:
-[#1][#2][#3][#4][#5][#6][#7][#8]...
-```
-
----
-
-# Getting started
-
-Plexo currently doesn't have pre-built releases, so you'll need to run it from source.
-
-## Requirements
-
-- **Windows 10/11, macOS, or Linux**: Windows uses its built-in Windows PowerShell for adapter metadata; macOS uses `networksetup`; Linux provides fallback interface detection and desktop network settings integration.
-- **Node.js**: 22.12+ (Node 22 LTS recommended).
-- **npm**: v9+ recommended.
-
----
-
-## Run Plexo locally
-
-Clone the repository:
-
-```bash
-git clone https://github.com/anmolkapil/plexo.git
-cd plexo
-```
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start the application in development mode:
-
-```bash
+```powershell
+git clone https://github.com/SheedaMusalli/Plexo-For-Windows.git
+cd Plexo-For-Windows
+npm ci
 npm run dev
 ```
 
----
-
-## Running tests
-
-Plexo includes an automated end-to-end test suite driven by Playwright:
-
-```bash
-npm run test:e2e:smoke          # quick smoke tests
-npm run test:e2e                # full E2E test suite (including integrity and chaos tests)
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md#end-to-end-tests) for testing options and debugging flags.
-
----
-
-# Build the macOS app
-
-To package Plexo as a standalone macOS application bundle:
-
-```bash
-npm run build:mac
-```
-
-The compiled application will be generated at:
-
-```text
-dist/mac/Plexo.app
-```
-
-> **Note on Gatekeeper:** The app is unsigned because it is not distributed with a paid Apple Developer certificate. However, because you compile it locally on your machine, macOS will not apply the quarantine flag (`com.apple.quarantine`). Gatekeeper only quarantines files downloaded from the web (via browsers, curl, etc.), so your locally built `Plexo.app` will launch cleanly without quarantine warnings.
-
-## Build the Windows app
-
-Run these commands from PowerShell in the project directory:
+To create the Windows installer and browser extension packages:
 
 ```powershell
-npm install
 npm run build:win
 ```
 
-The installer is generated at `dist/plexo-1.0.0-setup.exe`. For an unpacked app, run
-`npm run build:unpack` and launch `dist/win-unpacked/plexo.exe`.
-Local builds are unsigned.
+Build artifacts are written to `release/`. See [THIRD-PARTY-MEDIA.md](THIRD-PARTY-MEDIA.md) for bundled media-tool sources and licenses. Preserve the local `.signing/extension.pem` key if you rebuild and want to keep the same extension ID; do not publish that private key.
 
-Windows uses native window controls, Ctrl+V hints, File Explorer integration, and Windows
-Network Settings. Download filenames are normalized to Windows filename rules.
+## Checks
 
-### USB tethering on Windows
-
-Enable USB tethering on your phone and check that its adapter appears in Windows Network
-Settings. Install the phone manufacturer's Windows driver if Windows does not recognize it.
-TetherKit is only needed for the macOS setup below.
-
-Each selected network needs a working IPv4 connection and a route to the download server.
-Adapter detection does not guarantee Internet access: VPN, virtual, and isolated adapters may
-also appear. Check per-network latency and transfer stats. Combined throughput depends on the
-networks, Windows routing, and the server; it needs testing with your particular connections.
-
-Linux packaging remains available via `npm run build:linux` (see [Build the Linux app](#build-the-linux-app)).
-
----
-
-## Build the Linux app
-
-To package Plexo for Linux:
-
-```bash
-npm run build:linux
+```powershell
+npm run lint
+npm run typecheck
+npm run test:e2e:smoke
 ```
 
-The package will be generated in `dist/`.
+The browser integration tests use an isolated extension profile and native host. To run them against Microsoft Edge, set `PLEXO_TEST_BROWSER` to the Edge executable path before running the relevant Playwright tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for test and development notes.
 
----
+## Credits and license
 
-# Using a USB-tethered Android phone
-
-Android USB tethering requires an additional setup step on macOS.
-
-macOS lacks native support for the **RNDIS (Remote Network Driver Interface Specification)** protocol. An Android phone with USB tethering enabled will charge and support MTP/ADB, but macOS will not expose it as a network interface (this is also why legacy kernel extensions like `HoRNDIS` stopped functioning on modern macOS and Apple Silicon).
-
-## Install TetherKit
-
-[TetherKit](https://github.com/XiaoMiku01/TetherKit) is an open-source, kext-free, user-space RNDIS driver that makes Android USB tethering available as a standard network interface on macOS.
-
-Install it via Homebrew:
-
-```bash
-brew install XiaoMiku01/tap/tetherkit
-```
-
-### Steps:
-
-1. Connect your Android device via USB.
-2. On your phone, navigate to **Settings → Network & Internet → Hotspot & tethering** and enable **USB tethering**.
-3. Once TetherKit is active, macOS registers the device as a network interface.
-4. Open Plexo — the new interface will be automatically detected and ready to carry download chunks.
-
-Special thanks to [@XiaoMiku01](https://github.com/XiaoMiku01) for developing and open-sourcing TetherKit!
-
----
-
-# Contributing
-
-Contributions are welcome! Whether you're optimizing download concurrency, improving UI responsiveness, or testing new tethering setups:
-
-- 🐛 Fix bugs & edge cases
-- 🚀 Improve download engine & socket throughput
-- 🌐 Expand multi-interface detection to other platforms (Linux)
-- 🎨 Enhance UI/UX and dark mode styling
-- 🧪 Test diverse multi-network environments (5G tethering, Wi-Fi 6, 10GbE)
-- 📖 Improve documentation & guides
-
-For development setup, coding standards, and PR workflows, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
----
-
-# Tech stack
-
-Plexo is built with:
-
-- **Electron** — desktop runtime
-- **React 19** — declarative UI
-- **Tailwind CSS v4** & **Base UI** — modern styling and accessible component primitives
-- **TypeScript** — end-to-end type safety
-- **Zustand** — lightweight client state management
-- **Lucide React** — icons
-- **Playwright** — end-to-end testing suite
-- **electron-vite** — fast HMR and build tooling
-- **electron-builder** — multi-platform packaging (macOS, Windows, Linux)
-
----
-
-# Support
-
-If Plexo is useful to you, you can support it by:
-
-- ⭐ Starring the repo
-- 🐛 [Reporting bugs and suggesting features](https://github.com/anmolkapil/plexo/issues)
-- ❤️ [Sponsoring development](https://github.com/sponsors/anmolkapil)
-
----
-
-# License
-
-MIT — see [LICENSE](LICENSE).
+Plexo is based on the MIT-licensed work of [Anmol Kapil](https://github.com/anmolkapil/plexo). This Windows release and its browser integration are maintained by **Sheeda Musalli**. See [LICENSE](LICENSE) for license terms.
