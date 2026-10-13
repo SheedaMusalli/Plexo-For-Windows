@@ -15,4 +15,4 @@ native-host/*.exe
 # Downloaded and generated release media
 media-tools/
 delivery-stage-browser*/
-artifacts/*.exe\n
+artifacts/*.exe
