@@ -215,4 +215,6 @@ export interface StartDownloadRequest {
   lastModified: string | null
   /** Streams per network the user picked; left out, the count is decided automatically. */
   streamsPerNetwork?: number
+  /** Internal transfers such as YouTube's separate audio/video streams should not notify on completion. */
+  suppressNotifications?: boolean
 }

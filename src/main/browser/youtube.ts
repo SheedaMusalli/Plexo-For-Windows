@@ -473,31 +473,29 @@ export class YoutubeDownloads {
       if (job.state === 'cancelled') return
       if (selected.video && selected.audio) {
         job.message = 'Combining video and audio in Plexo…'
-        const ext = this.outputExtension(selected.video, selected.audio)
-        const output = await this.uniquePath(
-          destination,
-          `${this.safeStem(job.title)} [${info.id || 'youtube'}]`,
-          ext
-        )
+        const output = await this.uniquePath(destination, this.safeStem(job.title), 'mp4')
         reservedOutput = output
-        await this.mergeStreams(names[0], names[1], output, ext)
+        await this.muxVideo(names[0], names[1], output)
         job.path = output
         reservedOutput = undefined
       } else if (names[0]) {
         const source = names[0]
-        const ext = selected.audio?.ext || selected.video?.ext || 'mp4'
-        const output = await this.uniquePath(
-          destination,
-          `${this.safeStem(job.title)} [${info.id || 'youtube'}]`,
-          ext
-        )
+        const isVideo = Boolean(selected.video)
+        const ext = isVideo ? 'mp4' : selected.audio?.ext || 'm4a'
+        const output = await this.uniquePath(destination, this.safeStem(job.title), ext)
         reservedOutput = output
-        await rename(source, output)
+        if (isVideo) {
+          job.message = 'Preparing MP4 in Plexo…'
+          await this.muxVideo(source, undefined, output)
+        } else {
+          await rename(source, output)
+        }
         job.path = output
         reservedOutput = undefined
       }
       job.state = 'complete'
       job.message = `Saved with Plexo${job.path ? ': ' + job.path : ' to your Plexo download folder'}`
+      if (job.path) this.manager.notifyExternalCompletion(job.path.split(/[\\/]/).pop() || job.path)
     } catch (error) {
       if (reservedOutput) await rm(reservedOutput, { force: true }).catch(() => {})
       this.fail(job, error)
@@ -564,7 +562,8 @@ export class YoutubeDownloads {
       interfaceIds: (await listActiveInterfaces()).map((network) => network.id),
       etag: null,
       lastModified: null,
-      browserContext: streamContext
+      browserContext: streamContext,
+      suppressNotifications: true
     }
     job.message = `Plexo is downloading ${kind}…`
     job.lastProgressAt = Date.now()
@@ -632,12 +631,6 @@ export class YoutubeDownloads {
     )
   }
 
-  private outputExtension(video: YoutubeFormat, audio: YoutubeFormat): string {
-    if (video.ext === 'mp4' && audio.ext === 'm4a') return 'mp4'
-    if (video.ext === 'webm' && audio.ext === 'webm') return 'webm'
-    return 'mkv'
-  }
-
   private async uniquePath(folder: string, stem: string, ext: string): Promise<string> {
     for (let i = 0; i < 10000; i++) {
       const suffix = i ? ` (${i})` : ''
@@ -654,43 +647,50 @@ export class YoutubeDownloads {
     throw new Error('Could not choose an unused output file name.')
   }
 
-  private async mergeStreams(
-    video: string,
-    audio: string,
-    output: string,
-    ext: string
-  ): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      const args = [
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-y',
-        '-i',
-        video,
-        '-i',
-        audio,
-        '-map',
-        '0:v:0',
-        '-map',
-        '1:a:0',
-        '-c',
-        'copy'
-      ]
-      if (ext === 'mp4') args.push('-movflags', '+faststart')
-      args.push(output)
-      const child = spawn(join(this.tools, 'ffmpeg.exe'), args, { windowsHide: true, shell: false })
-      let errors = ''
-      child.stderr.on('data', (chunk: Buffer) => {
-        errors = (errors + chunk.toString()).slice(-2000)
+  private async muxVideo(video: string, audio: string | undefined, output: string): Promise<void> {
+    const run = (transcode: boolean): Promise<void> =>
+      new Promise<void>((resolve, reject) => {
+        const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', video]
+        if (audio) args.push('-i', audio)
+        args.push('-map', '0:v:0')
+        if (audio) args.push('-map', '1:a:0')
+        else args.push('-map', '0:a?')
+        if (transcode)
+          args.push(
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '18',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '192k'
+          )
+        else args.push('-c', 'copy')
+        args.push('-movflags', '+faststart')
+        args.push(output)
+        const child = spawn(join(this.tools, 'ffmpeg.exe'), args, {
+          windowsHide: true,
+          shell: false
+        })
+        let errors = ''
+        child.stderr.on('data', (chunk: Buffer) => {
+          errors = (errors + chunk.toString()).slice(-2000)
+        })
+        child.once('error', reject)
+        child.once('close', (code) =>
+          code === 0
+            ? resolve()
+            : reject(new Error(errors.trim() || 'Plexo could not combine these YouTube streams.'))
+        )
       })
-      child.once('error', reject)
-      child.once('close', (code) =>
-        code === 0
-          ? resolve()
-          : reject(new Error(errors.trim() || 'Plexo could not combine these YouTube streams.'))
-      )
-    })
+    try {
+      await run(false)
+    } catch {
+      await run(true)
+    }
   }
 
   private fail(job: Job, error: unknown): void {

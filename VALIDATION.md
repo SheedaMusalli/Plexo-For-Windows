@@ -9,6 +9,14 @@ Original baseline: Plexo 1.0.0-browser.1, Windows x64.
 - Browser-captured downloads yield the single Plexo transfer slot to an active YouTube media job, so another queued item cannot interrupt the video/audio pair.
 - TypeScript and ESLint passed after this change. No end-to-end or network transfer verification was run for this revision.
 
+## YouTube completion notification and MP4 naming: 1.0.0-browser.6
+
+- Individual Plexo transfers for YouTube's temporary video/audio streams suppress their normal completion notifications. Plexo reports completion once the finished MP4 is muxed and ready.
+- Video downloads use the YouTube title as the output name with an `.mp4` extension. Plexo first remuxes without re-encoding and falls back to H.264/AAC conversion if the selected streams cannot be muxed into MP4 directly. Audio-only downloads keep their audio extension.
+- TypeScript checks for main/preload/shared, renderer, and end-to-end types passed; ESLint passed.
+- FFmpeg's bundled build includes `libx264`; the Windows x64 installer, Chrome ZIP, and CRX3 rebuilt successfully with the existing extension ID.
+- No automated or live YouTube download test was run for this revision.
+
 ## Previous YouTube and page-button update: 1.0.0-browser.3 / extension 1.2.0
 
 - Final update checks: **4 browser integration tests passed** (52.1 seconds), **3 backend tests passed**, TypeScript and ESLint passed, Windows installer rebuilt, CRX3 signature verified, packaged media/extension files verified against tested files.

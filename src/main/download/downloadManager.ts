@@ -1087,11 +1087,13 @@ export class DownloadManager {
       runtime.state.bytesDownloaded = runtime.state.totalBytes || runtime.state.bytesDownloaded
       await this.persistNow(runtime)
       await runtime.file.discard().catch(() => {})
-      this.notify('Download Complete', `${runtime.state.fileName} has finished downloading.`)
+      if (!runtime.requestPayload.suppressNotifications)
+        this.notify('Download Complete', `${runtime.state.fileName} has finished downloading.`)
     } catch (error) {
       runtime.state.status = 'error'
       runtime.state.error = error instanceof Error ? error.message : String(error)
-      this.notify('Download Failed', `${runtime.state.fileName}: ${runtime.state.error}`)
+      if (!runtime.requestPayload.suppressNotifications)
+        this.notify('Download Failed', `${runtime.state.fileName}: ${runtime.state.error}`)
     }
     runtime.publishing = false
 
@@ -1111,7 +1113,8 @@ export class DownloadManager {
     runtime.state.status = 'error'
     runtime.state.error = message
     runtime.state.resumable = !discard
-    this.notify('Download Failed', `${runtime.state.fileName}: ${message}`)
+    if (!runtime.requestPayload.suppressNotifications)
+      this.notify('Download Failed', `${runtime.state.fileName}: ${message}`)
     this.stopRun(runtime)
   }
 
@@ -1402,6 +1405,11 @@ export class DownloadManager {
     } catch {
       // Best-effort notification
     }
+  }
+
+  /** One completion notification for a multi-step download after its final file is ready. */
+  notifyExternalCompletion(fileName: string): void {
+    this.notify('Download Complete', `${fileName} has finished downloading.`)
   }
 
   // --- attempts ---------------------------------------------------------------------------------
