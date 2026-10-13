@@ -63,6 +63,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
     if (window && !window.isDestroyed()) window.webContents.send(IpcChannels.networksChanged, list)
   })
   const manager = new DownloadManager(getWindow, networks)
+  handle('minimizeToTray', () => {
+    const window = getWindow()
+    if (process.platform === 'win32' && window && !window.isDestroyed()) window.hide()
+  })
   // Waking from sleep, the networks may have changed without a poll in between to see it.
   powerMonitor.on('resume', () => {
     manager.systemResumed()

@@ -51,6 +51,7 @@ const plexoApi = {
   cancelDownload: (downloadId: string) => invoke('cancelDownload', downloadId),
   removeDownload: (downloadId: string) => invoke('removeDownload', downloadId),
   checkForUpdate: () => invoke('checkForUpdate'),
+  minimizeToTray: () => invoke('minimizeToTray'),
 
   onDownloadUpdated: (callback: (update: DownloadUpdate) => void): (() => void) => {
     const listener = (_event: IpcRendererEvent, update: DownloadUpdate): void => callback(update)

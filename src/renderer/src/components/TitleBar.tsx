@@ -2,7 +2,7 @@ import { ColorBadge } from './ColorBadge'
 import { ThemeToggle } from './ThemeToggle'
 import { UpdateIndicator } from './UpdateIndicator'
 import { Button } from './ui/button'
-import { ListPlus } from 'lucide-react'
+import { ListPlus, PanelBottomClose } from 'lucide-react'
 
 export type TitleBarStatus =
   | { kind: 'none' }
@@ -97,6 +97,19 @@ export function TitleBar({
         Made by Sheeda Musalli
       </div>
       <UpdateIndicator />
+      {window.plexo.platform === 'win32' && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="size-[26px] shrink-0 [-webkit-app-region:no-drag]"
+          onClick={() => void window.plexo.minimizeToTray()}
+          aria-label="Minimize Plexo to tray"
+          title="Minimize to tray"
+        >
+          <PanelBottomClose className="size-3.5" />
+        </Button>
+      )}
       <ThemeToggle />
     </div>
   )

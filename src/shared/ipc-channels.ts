@@ -25,5 +25,6 @@ export const IpcChannels = {
   downloadConfirmation: 'download:confirmation',
   downloadQueueChanged: 'download:queue-changed',
   networksChanged: 'network:changed',
-  checkForUpdate: 'update:check'
+  checkForUpdate: 'update:check',
+  minimizeToTray: 'app:minimize-to-tray'
 } as const

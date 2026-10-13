@@ -41,4 +41,5 @@ export interface IpcContract {
   cancelDownload: { args: [id: string]; result: void }
   removeDownload: { args: [id: string]; result: void }
   checkForUpdate: { args: []; result: UpdateInfo | null }
+  minimizeToTray: { args: []; result: void }
 }
