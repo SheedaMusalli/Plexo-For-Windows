@@ -28,9 +28,17 @@ if (!primary) app.quit()
 function showWindow(): void {
   if (testKnobs.hideWindow) return
   if (!mainWindow) createWindow()
-  if (mainWindow?.isMinimized()) mainWindow.restore()
-  mainWindow?.show()
-  mainWindow?.focus()
+  const window = mainWindow
+  if (!window || window.isDestroyed()) return
+  if (window.isMinimized()) window.restore()
+  window.show()
+  if (process.platform === 'win32') {
+    // Browser/native-host requests can arrive while Windows considers the browser the active
+    // foreground process. Raising the Plexo window explicitly prevents it being left behind it.
+    window.moveTop()
+    app.focus()
+  }
+  window.focus()
 }
 app.on('second-instance', showWindow)
 
