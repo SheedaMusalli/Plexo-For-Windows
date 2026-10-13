@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# A second push to a PR makes the first run's answer irrelevant, so don't
+# spend a runner finishing it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # --ignore-scripts skips our postinstall: Electron's binary download
+      # (install-electron) and electron-builder's native rebuild. Both are
+      # needed to *run* the app;
+      # linting, typechecking and format-checking need only the packages
+      # themselves, and that download would otherwise dominate every run.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Check formatting
+        run: npm run format:check
+
+  e2e:
+    name: E2E (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Unlike the ci job, this one runs the app, so Electron's binary is needed.
+      - name: Install dependencies
+        run: npm ci
+
+      # Electron needs a display even with its window hidden.
+      - name: Run smoke tests
+        run: xvfb-run --auto-servernum npm run test:e2e:smoke
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 14

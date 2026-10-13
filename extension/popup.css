@@ -1,0 +1,120 @@
+:root {
+  color-scheme: dark;
+  font:
+    13px 'Segoe UI',
+    sans-serif;
+  background: #17191f;
+  color: #eee;
+}
+body {
+  width: 370px;
+  margin: 0;
+  padding: 20px;
+}
+header,
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+header img {
+  width: 40px;
+  height: 40px;
+}
+header div {
+  flex: 1;
+}
+h1 {
+  margin: 0;
+  font-size: 23px;
+}
+header span,
+.hint {
+  color: #a8afbe;
+  font-size: 12px;
+  line-height: 1.5;
+}
+h2 {
+  font-size: 14px;
+  flex: 1;
+}
+button {
+  background: #30394e;
+  border: 1px solid #48566f;
+  color: #fff;
+  border-radius: 7px;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+button:hover {
+  background: #435575;
+}
+input[type='url'],
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  background: #232630;
+  color: #fff;
+  border: 1px solid #454b59;
+  border-radius: 7px;
+  padding: 9px;
+}
+form label,
+details label {
+  display: block;
+  margin: 12px 0 8px;
+}
+input[type='url'] {
+  min-width: 0;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+input[type='checkbox'] {
+  accent-color: #7d9eff;
+}
+section {
+  border-top: 1px solid #343947;
+  margin-top: 18px;
+  padding-top: 5px;
+}
+#status {
+  padding: 10px;
+  background: #232b3b;
+  border-radius: 7px;
+}
+#message {
+  color: #b5caff;
+  overflow-wrap: anywhere;
+}
+details {
+  margin-top: 20px;
+  color: #b4bac7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+summary {
+  cursor: pointer;
+}
+.item {
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid #30343e;
+}
+.item button {
+  float: right;
+  margin-left: 8px;
+  font-size: 11px;
+}
+.error {
+  color: #ffbd94;
+}
+textarea {
+  height: 58px;
+}
+#media {
+  max-height: 180px;
+  overflow: auto;
+}

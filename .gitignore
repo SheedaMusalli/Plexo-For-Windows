@@ -1,0 +1,19 @@
+node_modules
+dist
+out
+.DS_Store
+.eslintcache
+*.log*
+test-results
+playwright-report
+*.tsbuildinfo
+
+.signing/
+release/
+native-host/*.exe
+
+# Downloaded and generated release media
+media-tools/
+delivery-stage-browser*/
+artifacts/*.exe
+

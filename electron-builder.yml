@@ -1,0 +1,66 @@
+appId: com.plexo.app
+productName: Plexo
+directories:
+  buildResources: build
+  output: release
+extraResources:
+  - from: media-tools
+    to: media-tools
+  - from: native-host
+    to: browser
+    filter: ['*.exe', '*.json', '*.txt']
+  - from: extension
+    to: extension
+files:
+  - '!{extension,native-host,media-tools,e2e,scripts,release,.signing}/**'
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  # koffi is only loaded on Linux (network/deviceBinding.ts) and ships prebuilds for every OS.
+  - '!node_modules/koffi/{src,vendor,doc}/**'
+  - '!node_modules/koffi/build/koffi/!(linux_x64|linux_arm64)/**'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+asarUnpack:
+  - resources/**
+win:
+  executableName: plexo
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  # No ${arch} on purpose: one installer holds both x64 and ARM64, and docs/downloads.js reads an
+  # installer with no architecture in its name as exactly that. Add one here and update it there.
+  artifactName: ${name}-${version}-setup.${ext}
+  # Assisted installer instead of one-click, so users can choose the install folder (and drive).
+  # One-click always installs to %LOCALAPPDATA%\Programs with no way to change it.
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    - NSDownloadsFolderUsageDescription: Plexo saves downloaded files to your Downloads folder.
+  notarize: false
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+linux:
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+  maintainer: electronjs.org
+  category: Utility
+appImage:
+  artifactName: ${name}-${version}-${arch}.${ext}
+npmRebuild: false
+publish:
+  provider: generic
+  url: https://example.com/auto-updates

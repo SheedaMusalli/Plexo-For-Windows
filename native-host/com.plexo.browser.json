@@ -1,0 +1,9 @@
+{
+  "name": "com.plexo.browser",
+  "description": "Plexo browser integration",
+  "path": "Plexo.BrowserHost.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://hhepjnimojcdbcifmjaflopikglidjbo/"
+  ]
+}
