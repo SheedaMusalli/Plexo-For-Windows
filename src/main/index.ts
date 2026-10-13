@@ -60,7 +60,16 @@ function createWindow(): void {
     // title bar occupy the rest of the strip instead of an OS-drawn title.
     ...(process.platform === 'darwin'
       ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }
-      : {}),
+      : process.platform === 'win32'
+        ? {
+            titleBarStyle: 'hidden',
+            titleBarOverlay: {
+              color: nativeTheme.shouldUseDarkColors ? '#202325' : '#fafafa',
+              symbolColor: nativeTheme.shouldUseDarkColors ? '#eae7e2' : '#1d1d1f',
+              height: 44
+            }
+          }
+        : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // A hidden e2e window would otherwise have its timers throttled.
@@ -118,6 +127,13 @@ app.whenReady().then(async () => {
 
   nativeTheme.on('updated', () => {
     mainWindow?.setBackgroundColor(nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#ffffff')
+    if (process.platform === 'win32') {
+      mainWindow?.setTitleBarOverlay({
+        color: nativeTheme.shouldUseDarkColors ? '#202325' : '#fafafa',
+        symbolColor: nativeTheme.shouldUseDarkColors ? '#eae7e2' : '#1d1d1f',
+        height: 44
+      })
+    }
   })
 
   createWindow()

@@ -34,6 +34,15 @@ export function TitleBar({
         // 16px inset + ~52px cluster width + a clear ~26px gap before our own content starts.
         isMac ? 'pl-[94px]' : 'pl-3.5'
       }`}
+      style={
+        window.plexo.platform === 'win32'
+          ? {
+              paddingLeft: 'env(titlebar-area-x, 14px)',
+              paddingRight:
+                'calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%))'
+            }
+          : undefined
+      }
     >
       <div
         // Matches the "LOCKUP · horizontal" wordmark spec from the final icon design.
@@ -97,6 +106,7 @@ export function TitleBar({
         Made by Sheeda Musalli
       </div>
       <UpdateIndicator />
+      <ThemeToggle />
       {window.plexo.platform === 'win32' && (
         <Button
           type="button"
@@ -110,7 +120,6 @@ export function TitleBar({
           <PanelBottomClose className="size-3.5" />
         </Button>
       )}
-      <ThemeToggle />
     </div>
   )
 }
