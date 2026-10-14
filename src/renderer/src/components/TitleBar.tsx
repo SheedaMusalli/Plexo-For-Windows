@@ -3,6 +3,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { UpdateIndicator } from './UpdateIndicator'
 import { Button } from './ui/button'
 import { ListPlus, PanelBottomClose } from 'lucide-react'
+import plexoLogo from '../../../../extension/icon.png'
 
 export type TitleBarStatus =
   | { kind: 'none' }
@@ -45,12 +46,17 @@ export function TitleBar({
       }
     >
       <div
-        // Matches the "LOCKUP · horizontal" wordmark spec from the final icon design.
-        className={`font-sans text-[13px] leading-none font-bold tracking-[-0.02em] ${
-          dimmed ? 'text-muted-foreground' : 'text-foreground'
-        }`}
+        className="flex shrink-0 items-center gap-2 [-webkit-app-region:no-drag]"
+        aria-label="Plexo"
       >
-        Plexo
+        <img src={plexoLogo} alt="" className="size-[22px] rounded-[5px] object-contain" />
+        <span
+          className={`font-sans text-[13px] leading-none font-bold tracking-[-0.02em] ${
+            dimmed ? 'text-muted-foreground' : 'text-foreground'
+          }`}
+        >
+          Plexo
+        </span>
       </div>
       <div className="flex-1" />
       {status.kind === 'combined' && (
