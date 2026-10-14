@@ -1,4 +1,4 @@
-import { Settings2, FolderOpen, Palette, RefreshCw, ListPlus, Gauge } from 'lucide-react'
+import { Settings2, FolderOpen, Palette, RefreshCw, ListPlus } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
@@ -6,13 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 export function SettingsDialog({
   open,
   onOpenChange,
-  onOpenQueue,
-  onOpenSpeedTest
+  onOpenQueue
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenQueue: () => void
-  onOpenSpeedTest: () => void
 }): React.JSX.Element {
   const destinationDir = useAppStore((s) => s.destinationDir)
   const downloadsDir = useAppStore((s) => s.downloadsDir)
@@ -56,22 +54,6 @@ export function SettingsDialog({
               }}
             >
               <ListPlus /> Open download queue
-            </Button>
-          </div>
-          <div className="rounded-lg border border-border p-3">
-            <div className="mb-2 text-sm font-medium">Internet speed test</div>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Measure your internet ping, download, and upload speeds.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                onOpenChange(false)
-                window.setTimeout(onOpenSpeedTest, 120)
-              }}
-            >
-              <Gauge /> Test internet speed
             </Button>
           </div>
         </section>

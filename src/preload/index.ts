@@ -7,7 +7,8 @@ import type {
   DownloadUpdate,
   InitialState,
   NetworkInterfaceInfo,
-  QueuedDownload
+  QueuedDownload,
+  SpeedTestDirection
 } from '../shared/types'
 
 /** Typed wrapper around ipcRenderer.invoke — the channel name picks its args/result shape out of
@@ -27,6 +28,13 @@ const plexoApi = {
 
   listInterfaces: () => invoke('listInterfaces'),
   pingInterfaces: () => invoke('pingInterfaces'),
+  measureNetworkSpeedSample: (
+    requestId: string,
+    networkId: string,
+    direction: SpeedTestDirection,
+    bytes: number
+  ) => invoke('measureNetworkSpeedSample', requestId, networkId, direction, bytes),
+  cancelNetworkSpeedSample: (requestId: string) => invoke('cancelNetworkSpeedSample', requestId),
   deviceBindingSupported: () => invoke('deviceBindingSupported'),
   openNetworkSettings: () => invoke('openNetworkSettings'),
   updateSettings: (patch: AppSettings) => invoke('updateSettings', patch),

@@ -10,7 +10,10 @@ export type Entry = Pick<
   | 'bytesDownloaded'
   | 'startedAt'
   | 'completedAt'
->
+> & {
+  peakSpeedBytesPerSec: number
+  avgSpeedBytesPerSec: number
+}
 export const key = 'plexo-download-history-v1'
 export function read(): Entry[] {
   try {
@@ -21,7 +24,7 @@ export function read(): Entry[] {
   }
 }
 let lastSaved = { id: '', status: '', at: 0 }
-export function rememberDownload(download: DownloadState): void {
+export function rememberDownload(download: DownloadState, peakSpeedBytesPerSec = 0): void {
   if (download.destinationPath.includes('.plexo-youtube-')) return
   if (
     lastSaved.id === download.id &&
@@ -41,6 +44,9 @@ export function rememberDownload(download: DownloadState): void {
     startedAt,
     completedAt
   } = download
+  const now = completedAt ?? Date.now()
+  const pausedMs = (download.totalPausedMs ?? 0) + (download.pausedAt ? now - download.pausedAt : 0)
+  const activeSeconds = Math.max(0, (now - startedAt - pausedMs) / 1000)
   const entries = read().filter((entry) => entry.id !== id)
   entries.unshift({
     id,
@@ -51,7 +57,9 @@ export function rememberDownload(download: DownloadState): void {
     totalBytes,
     bytesDownloaded,
     startedAt,
-    completedAt
+    completedAt,
+    peakSpeedBytesPerSec,
+    avgSpeedBytesPerSec: activeSeconds > 0 ? bytesDownloaded / activeSeconds : 0
   })
   try {
     localStorage.setItem(key, JSON.stringify(entries.slice(0, 2000)))

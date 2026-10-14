@@ -2,8 +2,10 @@ import type {
   AppSettings,
   DownloadUpdate,
   NetworkInterfaceInfo,
+  NetworkSpeedSample,
   ProbeResult,
   QueuedDownload,
+  SpeedTestDirection,
   StartDownloadRequest,
   UpdateInfo
 } from './types'
@@ -15,6 +17,11 @@ import type {
 export interface IpcContract {
   listInterfaces: { args: []; result: NetworkInterfaceInfo[] }
   pingInterfaces: { args: []; result: Record<string, number | null> }
+  measureNetworkSpeedSample: {
+    args: [requestId: string, networkId: string, direction: SpeedTestDirection, bytes: number]
+    result: NetworkSpeedSample
+  }
+  cancelNetworkSpeedSample: { args: [requestId: string]; result: void }
   deviceBindingSupported: { args: []; result: boolean }
   openNetworkSettings: { args: []; result: void }
   updateSettings: { args: [patch: AppSettings]; result: void }

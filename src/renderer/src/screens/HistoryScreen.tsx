@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
 import { read, key, type Entry } from '../history'
 import { Button } from '../components/ui/button'
+import { Gauge } from 'lucide-react'
 
 const size = (bytes: number): string => (bytes ? `${(bytes / 1048576).toFixed(1)} MB` : '—')
+const speed = (bytesPerSecond: number): string => {
+  if (!bytesPerSecond) return '—'
+  const mbps = bytesPerSecond / 1048576
+  return `${mbps < 10 ? mbps.toFixed(1) : Math.round(mbps)} MB/s`
+}
 export function HistoryScreen({
   onAdd,
   onQueue,
+  onSpeedTest,
   onRetry
 }: {
   onAdd: () => void
   onQueue: () => void
+  onSpeedTest: () => void
   onRetry: (url: string) => void
 }): React.JSX.Element {
   const [entries, setEntries] = useState(read)
@@ -51,6 +59,9 @@ export function HistoryScreen({
         <Button variant="outline" onClick={onQueue}>
           Queue & schedule
         </Button>
+        <Button variant="outline" onClick={onSpeedTest}>
+          <Gauge /> Speed test
+        </Button>
         <input
           aria-label="Search downloads"
           placeholder="Search downloads…"
@@ -73,7 +84,13 @@ export function HistoryScreen({
           ))}
         </aside>
         <div className="min-w-0 flex-1 overflow-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full min-w-[560px] table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[45%]" />
+              <col className="w-[18%]" />
+              <col className="w-[17%]" />
+              <col className="w-[20%]" />
+            </colgroup>
             <thead className="sticky top-0 bg-card text-xs text-muted-foreground">
               <tr>
                 {['File name', 'Size', 'Status', 'Added'].map((label) => (
@@ -91,7 +108,11 @@ export function HistoryScreen({
                   onClick={() => setSelected(entry)}
                   onDoubleClick={() => {
                     setSelected(entry)
-                    setProperties(true)
+                    if (entry.status === 'completed') {
+                      void window.plexo.openFile(entry.destinationPath).catch((e: unknown) => {
+                        setError(String(e))
+                      })
+                    }
                   }}
                   onContextMenu={(event) => {
                     event.preventDefault()
@@ -126,7 +147,15 @@ export function HistoryScreen({
         </div>
       </div>
       <footer className="border-t border-border px-4 py-2 text-xs text-muted-foreground">
-        {rows.length} downloads · Right-click a download for actions
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <span>{rows.length} downloads · Right-click a download for actions</span>
+          {entries[0] && (
+            <span>
+              Last download · Peak {speed(entries[0].peakSpeedBytesPerSec)} · Avg{' '}
+              {speed(entries[0].avgSpeedBytesPerSec)}
+            </span>
+          )}
+        </div>
         {error && (
           <p role="alert" className="text-destructive">
             {error}

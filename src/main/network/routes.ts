@@ -287,6 +287,11 @@ export interface ResponseStart {
   sentAt: number
 }
 
+export interface StreamRequestOptions {
+  method?: 'GET' | 'POST'
+  body?: Buffer
+}
+
 /**
  * One download stream's connection to the server, through one network. Requests reuse a single
  * kept-alive socket, so a stream pays for DNS, the TCP and TLS handshakes and TCP slow start once
@@ -345,9 +350,10 @@ export class StreamConnection {
   request(
     target: URL,
     headers: Record<string, string>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options: StreamRequestOptions = {}
   ): Promise<ResponseStart> {
-    return this.send(target, headers, signal, true)
+    return this.send(target, headers, signal, true, options)
   }
 
   /** Drops its sockets, in use or kept for reuse, so the next request opens a new one: they may
@@ -369,7 +375,8 @@ export class StreamConnection {
     target: URL,
     headers: Record<string, string>,
     signal: AbortSignal | undefined,
-    retryStale: boolean
+    retryStale: boolean,
+    requestOptions: StreamRequestOptions
   ): Promise<ResponseStart> {
     return new Promise((resolve, reject) => {
       if (signal?.aborted) return reject(abortError())
@@ -378,7 +385,7 @@ export class StreamConnection {
       let answered = false
       let timedOut = false
       const options: ConnectOptions = {
-        method: 'GET',
+        method: requestOptions.method ?? 'GET',
         hostname: targetHost(target),
         port: target.port || undefined,
         path: `${target.pathname}${target.search}`,
@@ -406,13 +413,13 @@ export class StreamConnection {
         // A kept-alive socket the server closed while it sat idle only fails once used, so the
         // request gets one more go on a new socket (the retry Node documents for `reusedSocket`).
         if (retryStale && req.reusedSocket && !timedOut && !signal?.aborted) {
-          resolve(this.send(target, headers, signal, false))
+          resolve(this.send(target, headers, signal, false, requestOptions))
         } else {
           reject(asConnectionError(error))
         }
       })
       signal?.addEventListener('abort', onAbort, { once: true })
-      req.end()
+      req.end(requestOptions.body)
     })
   }
 }

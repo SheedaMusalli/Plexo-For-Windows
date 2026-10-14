@@ -1,9 +1,11 @@
 {
   "name": "plexo",
-  "version": "2.0.1",
+  "version": "2.0.0",
   "description": "Speed up downloads by combining multiple network connections in parallel",
   "main": "./out/main/index.js",
-  "author": "Anmol Kapil",
+  "author": {
+    "name": "Sheeda Musalli"
+  },
   "homepage": "https://github.com/anmolkapil/plexo",
   "scripts": {
     "format": "prettier --write .",

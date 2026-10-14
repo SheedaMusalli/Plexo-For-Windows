@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { NetworkInterfaceInfo } from '../src/shared/types'
 import { StreamConnection } from '../src/main/network/routes'
+import { measureNetworkSpeedSample } from '../src/main/network/speedTest'
 
 const iface: NetworkInterfaceInfo = {
   id: 'wifi',
@@ -42,6 +43,66 @@ test('AAAA-only hostname connects over IPv6 and keeps its HTTP Host header @smok
     const { res } = await connection.request(new URL(`http://ipv6.example.test:${port}/file`), {})
     expect(await body(res)).toBe('ok')
     expect(seenHost).toBe(`ipv6.example.test:${port}`)
+  } finally {
+    connection.close()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('routed requests can send upload samples through a selected network @smoke', async () => {
+  let seenBody = ''
+  const server = createServer(async (req, res) => {
+    seenBody = await body(req)
+    res.end(String(seenBody.length))
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const connection = new StreamConnection(() => loopback, { timeoutMs: 2000 })
+  try {
+    const url = new URL(`http://127.0.0.1:${(server.address() as AddressInfo).port}/upload`)
+    const { res } = await connection.request(
+      url,
+      { 'content-type': 'application/octet-stream' },
+      undefined,
+      { method: 'POST', body: Buffer.from('sample bytes') }
+    )
+    expect(await body(res)).toBe(String('sample bytes'.length))
+    expect(seenBody).toBe('sample bytes')
+  } finally {
+    connection.close()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('network speed samples measure routed download and upload transfers @smoke', async () => {
+  let uploadedBytes = 0
+  const server = createServer(async (req, res) => {
+    if (req.url?.startsWith('/__down')) {
+      res.end(Buffer.alloc(Number(new URL(req.url, 'http://localhost').searchParams.get('bytes'))))
+      return
+    }
+    for await (const chunk of req) uploadedBytes += Buffer.byteLength(chunk)
+    res.end()
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as AddressInfo).port
+  const connection = new StreamConnection(() => loopback, { timeoutMs: 2000 })
+  const signal = new AbortController().signal
+  try {
+    const endpoint = `http://127.0.0.1:${port}`
+    const download = await measureNetworkSpeedSample(loopback, 'download', 2048, signal, {
+      connection,
+      endpoint
+    })
+    expect(download.bytes).toBe(2048)
+    expect(download.durationMs).toBeGreaterThan(0)
+
+    const upload = await measureNetworkSpeedSample(loopback, 'upload', 3072, signal, {
+      connection,
+      endpoint
+    })
+    expect(upload.bytes).toBe(3072)
+    expect(upload.durationMs).toBeGreaterThan(0)
+    expect(uploadedBytes).toBe(3072)
   } finally {
     connection.close()
     await new Promise<void>((resolve) => server.close(() => resolve()))

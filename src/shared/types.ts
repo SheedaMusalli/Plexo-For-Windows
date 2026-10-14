@@ -21,6 +21,13 @@ export interface NetworkInterfaceInfo {
   mac?: string
 }
 
+export type SpeedTestDirection = 'download' | 'upload'
+
+export interface NetworkSpeedSample {
+  bytes: number
+  durationMs: number
+}
+
 export interface ProbeResult {
   requestedUrl: string
   /** URL after following redirects — this is what the download should actually fetch. */

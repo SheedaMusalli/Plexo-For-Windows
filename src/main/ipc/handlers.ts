@@ -18,6 +18,8 @@ import { getDefaultDownloadsDir, getHomeDir } from '../download/paths'
 import { probeUrl } from '../download/probe'
 import { deviceBindingSupported } from '../network/deviceBinding'
 import { measureLatencies } from '../network/latency'
+import { createNetworkSpeedConnection, measureNetworkSpeedSample } from '../network/speedTest'
+import type { StreamConnection } from '../network/routes'
 import { NetworkMonitor } from '../network/interfaces'
 import { loadSettings, saveSettings } from '../settings'
 import { testKnobs } from '../testKnobs'
@@ -57,13 +59,32 @@ function handle<K extends keyof IpcContract>(
 const DESTINATION_CHECK_MS = 300
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null): DownloadManager {
+  const speedTestConnections = new Map<
+    string,
+    { connection: StreamConnection; signature: string }
+  >()
   // The main process keeps the network list, for downloads and the window alike.
   const networks = new NetworkMonitor((list) => {
+    const activeNetworks = new Map(list.map((network) => [network.id, network]))
+    for (const [id, entry] of speedTestConnections) {
+      const network = activeNetworks.get(id)
+      if (!network) {
+        entry.connection.close()
+        speedTestConnections.delete(id)
+      } else {
+        const signature = JSON.stringify(network)
+        if (signature !== entry.signature) {
+          entry.connection.reconnect()
+          entry.signature = signature
+        }
+      }
+    }
     manager.networksChanged()
     const window = getWindow()
     if (window && !window.isDestroyed()) window.webContents.send(IpcChannels.networksChanged, list)
   })
   const manager = new DownloadManager(getWindow, networks)
+  const speedTestSamples = new Map<string, AbortController>()
   handle('minimizeToTray', () => {
     const window = getWindow()
     if (process.platform === 'win32' && window && !window.isDestroyed()) window.hide()
@@ -77,6 +98,35 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
   handle('listInterfaces', () => networks.refresh())
 
   handle('pingInterfaces', async () => measureLatencies(networks.current ?? []))
+
+  handle('measureNetworkSpeedSample', async (_event, requestId, networkId, direction, bytes) => {
+    if (!/^[\w:-]{1,100}$/.test(requestId) || speedTestSamples.has(requestId)) {
+      throw new Error('The speed-test request is invalid.')
+    }
+    const network = networks.find(networkId)
+    if (!network) throw new Error('That network is no longer connected.')
+    const controller = new AbortController()
+    speedTestSamples.set(requestId, controller)
+    let entry = speedTestConnections.get(networkId)
+    if (!entry) {
+      entry = {
+        connection: createNetworkSpeedConnection(() => networks.find(networkId)),
+        signature: JSON.stringify(network)
+      }
+      speedTestConnections.set(networkId, entry)
+    }
+    try {
+      return await measureNetworkSpeedSample(network, direction, bytes, controller.signal, {
+        connection: entry.connection
+      })
+    } finally {
+      speedTestSamples.delete(requestId)
+    }
+  })
+
+  handle('cancelNetworkSpeedSample', (_event, requestId) => {
+    speedTestSamples.get(requestId)?.abort()
+  })
 
   // Started now so it has settled before the first ping or download needs it.
   const bindingSupport = deviceBindingSupported()

@@ -1,11 +1,14 @@
 import { Activity, Gauge, Pause, Play, RotateCcw, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { NetworkInterfaceInfo } from '@shared/types'
+import { useAppStore } from '../store/useAppStore'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog'
 
 type TestStatus = 'ready' | 'running' | 'paused' | 'complete' | 'error'
 type TestPhase = 'latency' | 'download' | 'upload' | 'complete'
 type Direction = 'download' | 'upload'
+type TestMode = 'internet' | 'combined'
 
 interface Metrics {
   ping?: number
@@ -33,7 +36,9 @@ const WARMUP_BYTES = 250_000
 const STREAMS_PER_SAMPLE = 4
 const MAX_BYTES_PER_STREAM = 8_000_000
 let requestSequence = 0
+let networkRequestSequence = 0
 const uploadPayloads = new Map<number, string>()
+const monotonicNow = (): number => performance.now()
 
 function formatSpeed(bitsPerSecond: number | undefined): string {
   if (typeof bitsPerSecond !== 'number' || !Number.isFinite(bitsPerSecond) || bitsPerSecond <= 0)
@@ -93,7 +98,8 @@ async function waitUntilResumed(session: TestSession): Promise<void> {
 async function measureRequest(
   session: TestSession,
   direction: Direction,
-  bytes: number
+  bytes: number,
+  networkId?: string
 ): Promise<Sample> {
   while (true) {
     await waitUntilResumed(session)
@@ -101,6 +107,25 @@ async function measureRequest(
     const pauseGeneration = session.pauseGeneration
     session.controllers.add(controller)
     const startedAt = performance.now()
+
+    if (networkId) {
+      const requestId = `speed-${Date.now()}-${++networkRequestSequence}`
+      const cancelRequest = (): void => {
+        void window.plexo.cancelNetworkSpeedSample(requestId).catch(() => undefined)
+      }
+      controller.signal.addEventListener('abort', cancelRequest, { once: true })
+      try {
+        return await window.plexo.measureNetworkSpeedSample(requestId, networkId, direction, bytes)
+      } catch (reason) {
+        if (session.cancelled) throw new Error('Speed test cancelled')
+        if (session.paused || session.pauseGeneration !== pauseGeneration) continue
+        throw reason instanceof Error ? reason : new Error('The network speed-test request failed.')
+      } finally {
+        controller.signal.removeEventListener('abort', cancelRequest)
+        session.controllers.delete(controller)
+      }
+    }
+
     const url = new URL(
       direction === 'download'
         ? 'https://speed.cloudflare.com/__down'
@@ -141,13 +166,17 @@ async function measureRequest(
 async function measureParallelSample(
   session: TestSession,
   direction: Direction,
-  bytesPerStream: number
+  bytesPerStream: number,
+  mode: TestMode,
+  networkIds: string[]
 ): Promise<Sample> {
   const startedAt = performance.now()
   const pausedAtStart = session.pausedTotalMs
   const samples = await Promise.all(
-    Array.from({ length: STREAMS_PER_SAMPLE }, () =>
-      measureRequest(session, direction, bytesPerStream)
+    (mode === 'combined' ? networkIds : [undefined]).flatMap((networkId) =>
+      Array.from({ length: STREAMS_PER_SAMPLE }, () =>
+        measureRequest(session, direction, bytesPerStream, networkId)
+      )
     )
   )
   return {
@@ -207,6 +236,38 @@ export function SpeedTestDialog({
   const [error, setError] = useState<string | null>(null)
   const [durationSeconds, setDurationSeconds] = useState(20)
   const [progress, setProgress] = useState(0)
+  const interfaces = useAppStore((store) => store.interfaces)
+  const [testMode, setTestMode] = useState<TestMode>('internet')
+  const [networkSelection, setNetworkSelection] = useState<string[] | null>(null)
+  const [bindingSupported, setBindingSupported] = useState<boolean | null>(null)
+  const selectedNetworkIds =
+    networkSelection === null
+      ? interfaces.map((network) => network.id)
+      : networkSelection.filter((id) => interfaces.some((network) => network.id === id))
+
+  useEffect(() => {
+    let current = true
+    void window.plexo.deviceBindingSupported().then(
+      (supported) => current && setBindingSupported(supported),
+      () => current && setBindingSupported(false)
+    )
+    return () => {
+      current = false
+    }
+  }, [])
+
+  const selectedSubnets = selectedNetworkIds.flatMap((id) => {
+    const network = interfaces.find((item) => item.id === id)
+    const subnet = network?.addresses.find((address) => address.family === 4)?.subnet
+    return subnet ? [{ subnet, name: network?.displayName ?? id }] : []
+  })
+  const subnetGroups = new Map<string, string[]>()
+  for (const item of selectedSubnets) {
+    const names = subnetGroups.get(item.subnet) ?? []
+    names.push(item.name)
+    subnetGroups.set(item.subnet, names)
+  }
+  const subnetConflict = [...subnetGroups.entries()].find(([, names]) => names.length > 1)
 
   const cancelSession = (session = sessionRef.current): void => {
     if (!session) return
@@ -232,13 +293,25 @@ export function SpeedTestDialog({
     if (sessionRef.current === session && !session.cancelled) update()
   }
 
-  const run = async (session: TestSession, totalDurationSeconds: number): Promise<void> => {
+  const run = async (
+    session: TestSession,
+    totalDurationSeconds: number,
+    mode: TestMode,
+    networkIds: string[]
+  ): Promise<void> => {
     const pingSamples: number[] = []
     updateIfCurrent(session, () => setPhase('latency'))
     for (let index = 0; index < 6; index += 1) {
-      const sample = await measureRequest(session, 'download', 0)
+      const pingResults =
+        mode === 'combined'
+          ? await Promise.all(
+              networkIds.map((networkId) => measureRequest(session, 'download', 0, networkId))
+            )
+          : [await measureRequest(session, 'download', 0)]
       // Ignore the first connection setup so ping is based on a warmed-up route.
-      if (index > 0) pingSamples.push(sample.durationMs)
+      if (index > 0) {
+        pingSamples.push(median(pingResults.map((sample) => sample.durationMs)) ?? 0)
+      }
       updateIfCurrent(session, () => {
         setProgress(((index + 1) / 6) * 10)
         setMetrics((previous) => ({
@@ -263,7 +336,7 @@ export function SpeedTestDialog({
         setPhase(direction)
         setProgress(progressStart)
       })
-      const warmup = await measureRequest(session, direction, WARMUP_BYTES)
+      const warmup = await measureParallelSample(session, direction, WARMUP_BYTES, mode, networkIds)
       const initialSpeed = (warmup.bytes * 8 * 1000) / warmup.durationMs
       // Four simultaneous requests use the available bandwidth more effectively than
       // one short request. Size each stream for roughly a second of the warm-up rate,
@@ -271,16 +344,19 @@ export function SpeedTestDialog({
       let sampleBytes = Math.round(
         Math.min(
           MAX_BYTES_PER_STREAM,
-          Math.max(WARMUP_BYTES, initialSpeed / 8 / STREAMS_PER_SAMPLE)
+          Math.max(
+            WARMUP_BYTES,
+            initialSpeed / 8 / STREAMS_PER_SAMPLE / (mode === 'combined' ? networkIds.length : 1)
+          )
         )
       )
       const samples: Sample[] = []
-      const directionStartedAt = performance.now()
+      const directionStartedAt = monotonicNow()
       const pausedAtDirectionStart = session.pausedTotalMs
       while (
         activeElapsedMs(session, directionStartedAt, pausedAtDirectionStart) < directionDurationMs
       ) {
-        samples.push(await measureParallelSample(session, direction, sampleBytes))
+        samples.push(await measureParallelSample(session, direction, sampleBytes, mode, networkIds))
         const speed = sampleSpeed(samples)
         updateIfCurrent(session, () => {
           const elapsed = activeElapsedMs(session, directionStartedAt, pausedAtDirectionStart)
@@ -289,7 +365,13 @@ export function SpeedTestDialog({
         })
         if (speed) {
           sampleBytes = Math.round(
-            Math.min(MAX_BYTES_PER_STREAM, Math.max(WARMUP_BYTES, speed / 8 / STREAMS_PER_SAMPLE))
+            Math.min(
+              MAX_BYTES_PER_STREAM,
+              Math.max(
+                WARMUP_BYTES,
+                speed / 8 / STREAMS_PER_SAMPLE / (mode === 'combined' ? networkIds.length : 1)
+              )
+            )
           )
         }
       }
@@ -303,6 +385,22 @@ export function SpeedTestDialog({
   }
 
   const start = (): void => {
+    if (testMode === 'combined' && bindingSupported !== true) {
+      setError(
+        'Per-network routing is not available on this system, so Plexo cannot measure a combined result accurately.'
+      )
+      return
+    }
+    if (testMode === 'combined' && subnetConflict) {
+      setError(
+        `${subnetConflict[1].join(' and ')} share ${subnetConflict[0]}; select networks on distinct subnets to combine their speeds.`
+      )
+      return
+    }
+    if (testMode === 'combined' && selectedNetworkIds.length === 0) {
+      setError('Select at least one connected network to run the combined test.')
+      return
+    }
     cancelSession()
     const session: TestSession = {
       cancelled: false,
@@ -319,8 +417,9 @@ export function SpeedTestDialog({
     setMetrics({})
     setError(null)
     setProgress(0)
-    void run(session, durationSeconds).catch((reason: unknown) => {
+    void run(session, durationSeconds, testMode, selectedNetworkIds).catch((reason: unknown) => {
       if (session.cancelled || sessionRef.current !== session) return
+      cancelSession(session)
       setStatus('error')
       setError(
         reason instanceof Error
@@ -384,17 +483,102 @@ export function SpeedTestDialog({
 
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto overscroll-contain p-4 sm:p-5">
+      <DialogContent
+        size="wide"
+        className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-4 sm:p-5"
+      >
         <DialogHeader className="pr-7">
           <DialogTitle className="flex items-center gap-2">
-            <Gauge className="size-4" /> Plexo internet speed test
+            <Gauge className="size-4" />
+            {testMode === 'internet'
+              ? 'Plexo internet speed test'
+              : 'Plexo combined network speed test'}
           </DialogTitle>
           <DialogDescription>
-            A real connection test against Cloudflare&apos;s edge network.
+            {testMode === 'internet'
+              ? 'A real connection test against Cloudflare’s edge network.'
+              : 'Transfers run through each selected network at the same time, then their speeds are combined.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Speed test mode">
+          <Button
+            type="button"
+            variant={testMode === 'internet' ? 'default' : 'outline'}
+            aria-pressed={testMode === 'internet'}
+            disabled={status === 'running' || status === 'paused'}
+            onClick={() => setTestMode('internet')}
+          >
+            Internet
+          </Button>
+          <Button
+            type="button"
+            variant={testMode === 'combined' ? 'default' : 'outline'}
+            aria-pressed={testMode === 'combined'}
+            disabled={status === 'running' || status === 'paused'}
+            onClick={() => setTestMode('combined')}
+          >
+            Combined networks
+          </Button>
+        </div>
+
+        {testMode === 'combined' && (
+          <div
+            className="space-y-2 rounded-lg border border-border p-3"
+            aria-label="Networks to test"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium">Networks to combine</span>
+              <span className="text-xs text-muted-foreground">
+                {selectedNetworkIds.length} selected
+              </span>
+            </div>
+            {interfaces.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No connected network interfaces found.
+              </p>
+            ) : (
+              <div className="grid gap-1 sm:grid-cols-2">
+                {interfaces.map((network: NetworkInterfaceInfo) => (
+                  <label
+                    key={network.id}
+                    className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedNetworkIds.includes(network.id)}
+                      disabled={status === 'running' || status === 'paused'}
+                      onChange={(event) => {
+                        setNetworkSelection((previous) => {
+                          const current = previous ?? interfaces.map((item) => item.id)
+                          return event.target.checked
+                            ? [...current, network.id]
+                            : current.filter((id) => id !== network.id)
+                        })
+                      }}
+                    />
+                    <span className="truncate" title={network.displayName}>
+                      {network.displayName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {bindingSupported === false && (
+              <p className="text-xs text-destructive" role="alert">
+                This system cannot route test traffic through individual network adapters.
+              </p>
+            )}
+            {subnetConflict && (
+              <p className="text-xs text-destructive" role="alert">
+                {subnetConflict[1].join(' and ')} share {subnetConflict[0]}. Select networks on
+                distinct subnets to combine their speeds.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="grid gap-3">
           <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
@@ -464,7 +648,15 @@ export function SpeedTestDialog({
                   </Button>
                 </>
               ) : (
-                <Button onClick={start}>
+                <Button
+                  onClick={start}
+                  disabled={
+                    testMode === 'combined' &&
+                    (selectedNetworkIds.length === 0 ||
+                      bindingSupported !== true ||
+                      Boolean(subnetConflict))
+                  }
+                >
                   {status === 'complete' || status === 'error' ? <RotateCcw /> : <Play />}
                   {status === 'complete' || status === 'error' ? 'Run again' : 'Start test'}
                 </Button>
@@ -477,7 +669,7 @@ export function SpeedTestDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Metric label="Ping" value={formatLatency(metrics.ping)} />
             <Metric label="Jitter" value={formatJitter(metrics.jitter)} />
             <Metric label="Download" value={formatSpeed(metrics.download)} tone="download" />

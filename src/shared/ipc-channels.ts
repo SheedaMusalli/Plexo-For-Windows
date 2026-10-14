@@ -1,6 +1,8 @@
 export const IpcChannels = {
   listInterfaces: 'network:list-interfaces',
   pingInterfaces: 'network:ping-interfaces',
+  measureNetworkSpeedSample: 'network:speed-test-sample',
+  cancelNetworkSpeedSample: 'network:speed-test-cancel-sample',
   deviceBindingSupported: 'network:device-binding-supported',
   openNetworkSettings: 'network:open-settings',
   probeUrl: 'download:probe',

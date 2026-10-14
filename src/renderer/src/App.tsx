@@ -91,6 +91,7 @@ function App(): React.JSX.Element {
   const interfaces = useAppStore((store) => store.interfaces)
   const interfacesStatus = useAppStore((store) => store.interfacesStatus)
   const currentDownload = useAppStore((store) => store.currentDownload)
+  const peakSpeedBytesPerSec = useAppStore((store) => store.peakSpeedBytesPerSec)
   const clearCurrentDownload = useAppStore((store) => store.clearCurrentDownload)
   const checkForUpdate = useAppStore((store) => store.checkForUpdate)
 
@@ -123,8 +124,8 @@ function App(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (currentDownload) rememberDownload(currentDownload)
-  }, [currentDownload])
+    if (currentDownload) rememberDownload(currentDownload, peakSpeedBytesPerSec)
+  }, [currentDownload, peakSpeedBytesPerSec])
 
   const noConnections = interfacesStatus === 'ready' && interfaces.length === 0
 
@@ -146,6 +147,7 @@ function App(): React.JSX.Element {
       <HistoryScreen
         onAdd={() => setAdding(true)}
         onQueue={() => setQueueOpen(true)}
+        onSpeedTest={() => setSpeedTestOpen(true)}
         onRetry={(url) => {
           useAppStore.getState().setDraftUrl(url)
           setAdding(true)
@@ -181,7 +183,6 @@ function App(): React.JSX.Element {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           onOpenQueue={() => setQueueOpen(true)}
-          onOpenSpeedTest={() => setSpeedTestOpen(true)}
         />
         <SpeedTestDialog open={speedTestOpen} onOpenChange={setSpeedTestOpen} />
       </div>

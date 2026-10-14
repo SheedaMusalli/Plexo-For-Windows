@@ -19,6 +19,12 @@ async function stubNativeUi(
     const revealed: string[] = []
     ;(globalThis as Record<string, unknown>).__revealed = revealed
     shell.showItemInFolder = (path: string) => void revealed.push(path)
+    const opened: string[] = []
+    ;(globalThis as Record<string, unknown>).__opened = opened
+    shell.openPath = async (path: string) => {
+      opened.push(path)
+      return ''
+    }
   }, destination)
 }
 
@@ -31,8 +37,7 @@ test.describe('UI journeys @smoke', () => {
       await route.abort()
     })
 
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('button', { name: 'Test internet speed' }).click()
+    await page.getByRole('button', { name: 'Speed test' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
     await expect(dialog.getByText('Ready when you are')).toBeVisible()
@@ -52,6 +57,88 @@ test.describe('UI journeys @smoke', () => {
 
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toBeHidden()
+  })
+
+  test('speed test dialog uses the available width in a compact window', async ({ plexo }) => {
+    await plexo.evaluateMain((_electron) => {
+      _electron.BrowserWindow.getAllWindows()[0].setSize(720, 650)
+    }, null)
+
+    const page = plexo.page
+    await page.getByRole('button', { name: 'Speed test' }).click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
+    const bounds = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return { left: rect.left, right: rect.right, width: rect.width }
+    })
+    const viewportWidth = await page.evaluate(() => innerWidth)
+
+    expect(bounds.width).toBeGreaterThan(600)
+    expect(bounds.left).toBeGreaterThanOrEqual(0)
+    expect(bounds.right).toBeLessThanOrEqual(viewportWidth)
+    await expect(dialog.getByLabel('Speed test duration')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Start test' })).toBeInViewport()
+    for (const label of ['Ping result', 'Jitter result', 'Download result', 'Upload result']) {
+      await expect(dialog.getByLabel(label)).toBeVisible()
+    }
+  })
+
+  test('double-clicking a completed history item opens its file', async ({ plexo, dirs }) => {
+    await stubNativeUi(plexo, dirs.dest)
+    const filePath = join(dirs.dest, 'finished.zip')
+    await writeFile(filePath, 'finished')
+    await plexo.page.evaluate((path) => {
+      localStorage.setItem(
+        'plexo-download-history-v1',
+        JSON.stringify([
+          {
+            id: 'finished-download',
+            fileName: 'finished.zip',
+            url: 'https://example.com/finished.zip',
+            destinationPath: path,
+            status: 'completed',
+            totalBytes: 8,
+            bytesDownloaded: 8,
+            startedAt: Date.now() - 1000,
+            completedAt: Date.now(),
+            peakSpeedBytesPerSec: 3 * 1048576,
+            avgSpeedBytesPerSec: 2.5 * 1048576
+          }
+        ])
+      )
+    }, filePath)
+    await plexo.page.reload()
+    await plexo.page.getByRole('row', { name: /finished\.zip/ }).dblclick()
+    await expect
+      .poll(() => plexo.evaluateMain(() => (globalThis as Record<string, unknown>).__opened, null))
+      .toEqual([filePath])
+    await expect(
+      plexo.page.getByText(/Last download · Peak 3\.0 MB\/s · Avg 2\.5 MB\/s/)
+    ).toBeVisible()
+  })
+
+  test('lets users select combined networks in the speed test', async ({ plexo }) => {
+    await plexo.page.getByRole('button', { name: 'Speed test' }).click()
+    const dialog = plexo.page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Internet' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+
+    await dialog.getByRole('button', { name: 'Combined networks' }).click()
+    await expect(
+      dialog.getByRole('heading', { name: 'Plexo combined network speed test' })
+    ).toBeVisible()
+    const networkGroup = dialog.getByLabel('Networks to test')
+    await expect(networkGroup.getByText(/\d+ selected/)).toBeVisible()
+    await expect(networkGroup.getByRole('checkbox').first()).toBeChecked()
+    await expect(dialog.getByRole('button', { name: 'Internet' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
   })
 
   test('shows measured speed results after download and upload samples complete', async ({
@@ -85,8 +172,7 @@ test.describe('UI journeys @smoke', () => {
       if (bytes > 100_000) inFlight -= 1
     })
     const page = plexo.page
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('button', { name: 'Test internet speed' }).click()
+    await page.getByRole('button', { name: 'Speed test' }).click()
     const dialog = page.getByRole('dialog')
     const duration = dialog.getByLabel('Speed test duration')
     await expect(duration).toHaveValue('20')
