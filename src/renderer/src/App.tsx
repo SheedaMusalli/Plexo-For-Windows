@@ -1,3 +1,5 @@
+import { HistoryScreen } from './screens/HistoryScreen'
+import { rememberDownload } from './history'
 import type { DownloadState } from '@shared/types'
 import { useEffect, useState } from 'react'
 import { TitleBar, type TitleBarStatus } from './components/TitleBar'
@@ -68,6 +70,7 @@ function renderDownload(
 function App(): React.JSX.Element {
   useDownloadEvents()
   useNetworkEvents()
+  const [adding, setAdding] = useState(false)
   const [queueCount, setQueueCount] = useState(0)
   const [queueOpen, setQueueOpen] = useState(false)
 
@@ -102,8 +105,13 @@ function App(): React.JSX.Element {
       void window.plexo.removeDownload(currentDownload.id)
       clearCurrentDownload()
       useAppStore.getState().setDraftUrl(url)
+      setAdding(true)
     }
   }
+
+  useEffect(() => {
+    if (currentDownload) rememberDownload(currentDownload)
+  }, [currentDownload])
 
   const noConnections = interfacesStatus === 'ready' && interfaces.length === 0
 
@@ -115,11 +123,23 @@ function App(): React.JSX.Element {
       onNewDownload: handleNewDownload,
       onDownloadAgain: handleDownloadAgain
     }))
-  } else if (noConnections) {
+  } else if (noConnections && adding) {
     screen = <NoConnectionsScreen />
     titleBarStatus = { kind: 'offline' }
   } else {
-    screen = <IdleScreen />
+    screen = adding ? (
+      <IdleScreen />
+    ) : (
+      <HistoryScreen
+        onAdd={() => setAdding(true)}
+        onQueue={() => setQueueOpen(true)}
+        onRetry={(url) => {
+          useAppStore.getState().setDraftUrl(url)
+          setAdding(true)
+          setAdding(true)
+        }}
+      />
+    )
   }
 
   return (
@@ -130,6 +150,14 @@ function App(): React.JSX.Element {
           queueCount={queueCount}
           onOpenQueue={() => setQueueOpen(true)}
         />
+        {adding && !currentDownload && (
+          <button
+            className="px-4 py-2 text-left text-sm text-muted-foreground"
+            onClick={() => setAdding(false)}
+          >
+            ← Downloads library
+          </button>
+        )}
         <div className="min-h-0 flex-1">{screen}</div>
         <UpdateDialog />
         <NetworkBindingDialog />
