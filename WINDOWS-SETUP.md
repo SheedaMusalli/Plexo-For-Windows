@@ -1,6 +1,6 @@
 # Plexo for Windows + Chrome
 
-Custom build: **2.0.0**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
+Plexo for Windows **2.0.0**, x64. Maintained by **Sheeda Musalli**. The desktop app uses Electron, and the browser helper is a compiled Windows .NET executable. License terms and notices are in [LICENSE](LICENSE).
 
 ## Update an existing installation
 

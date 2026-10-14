@@ -1323,10 +1323,10 @@
           <circle cx="640" cy="512" r="74" fill="#f7f4ef" />
         </svg>
         <div class="wordmark">Plexo</div>
-        <div class="badge">PRE-RELEASE</div>
+        <div class="badge">WINDOWS RELEASE</div>
         <div class="spacer"></div>
         <a class="support-link" href="#support">Support</a>
-        <a href="https://github.com/anmolkapil/plexo">GitHub</a>
+        <a href="https://github.com/SheedaMusalli/Plexo-For-Windows">GitHub</a>
       </header>
 
       <div class="top">
@@ -1344,7 +1344,7 @@
             <a
               class="primary-btn"
               id="primary-btn"
-              href="https://github.com/anmolkapil/plexo/releases/latest"
+              href="https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1389,7 +1389,7 @@
           <div class="older">
             <div class="label" id="older-label" hidden>EARLIER VERSIONS</div>
             <ul id="older-list"></ul>
-            <a class="all" href="https://github.com/anmolkapil/plexo/releases"
+            <a class="all" href="https://github.com/SheedaMusalli/Plexo-For-Windows/releases"
               >All releases on GitHub →</a
             >
           </div>
@@ -1400,22 +1400,22 @@
         <ul class="carousel-track" id="shots-track">
           <li>
             <img
-              src="screenshots/links.png"
-              alt="Plexo's link picker showing Wi-Fi and USB Tethering selected, with ping and parallel stream controls."
+              src="screenshots/link-setup-v2.png"
+              alt="Plexo download setup with save location, stream options, and detected network connections."
               loading="lazy"
             />
           </li>
           <li>
             <img
-              src="screenshots/downloading.png"
-              alt="Plexo combining Wi-Fi and USB tethering into one 27.9 MB/s download, with per-network speed and progress."
+              src="screenshots/history-v2.png"
+              alt="Plexo download history with completed downloads and status information."
               loading="lazy"
             />
           </li>
           <li>
             <img
-              src="screenshots/complete.png"
-              alt="Plexo download complete summary: 109.3 MB in 8 seconds at 39.4 MB/s peak, split across Wi-Fi and USB tethering."
+              src="screenshots/speed-test-combined-v2.png"
+              alt="Plexo combined network speed test results across two selected network adapters."
               loading="lazy"
             />
           </li>
@@ -1582,15 +1582,15 @@
         <div class="ways" id="ways" hidden>
           <p class="lead" id="ways-lead">Other ways to support Plexo</p>
           <div class="ways-grid">
-            <a class="way primary" href="https://github.com/sponsors/anmolkapil">
-              <strong>Sponsor on GitHub</strong>
-              One-off or monthly, any amount. Goes straight to licenses and development.
+            <a class="way primary" href="https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest">
+              <strong>Download Plexo</strong>
+              Get the latest Windows installer and browser extension.
             </a>
-            <a class="way" href="https://github.com/anmolkapil/plexo">
+            <a class="way" href="https://github.com/SheedaMusalli/Plexo-For-Windows">
               <strong>Star the repo</strong>
               Helps more people find Plexo, and costs nothing.
             </a>
-            <a class="way" href="https://github.com/anmolkapil/plexo/issues/new">
+            <a class="way" href="https://github.com/SheedaMusalli/Plexo-For-Windows/issues/new">
               <strong>Report bugs, suggest features</strong>
               Good reports make every release better.
             </a>
@@ -1605,8 +1605,8 @@
       <footer>
         <div class="ver" id="version-label">PLEXO</div>
         <div class="spacer"></div>
-        <a href="https://github.com/anmolkapil/plexo">Source</a>
-        <a href="https://github.com/anmolkapil/plexo/issues/new">Report an issue</a>
+        <a href="https://github.com/SheedaMusalli/Plexo-For-Windows">Source</a>
+        <a href="https://github.com/SheedaMusalli/Plexo-For-Windows/issues/new">Report an issue</a>
       </footer>
     </div>
 
@@ -1691,7 +1691,7 @@
       })()
 
       ;(function () {
-        var REPO = 'anmolkapil/plexo'
+        var REPO = 'SheedaMusalli/Plexo-For-Windows'
         var repoUrl = 'https://github.com/' + REPO
         var D = window.PlexoDownloads
 
@@ -2067,7 +2067,7 @@
       // vote twice by reloading.
       ;(function () {
         var API = 'https://abacus.jasoncameron.dev'
-        var NAMESPACE = 'anmolkapil-plexo'
+        var NAMESPACE = 'sheedamusalli-plexo-for-windows'
         var KEYS = { yes: 'ads-poll-yes', no: 'ads-poll-no' }
         var STORE = 'plexo-ads-poll'
         var REFRESH_MS = 15000
@@ -2191,7 +2191,7 @@
 
         var share = document.getElementById('share-btn')
         share.addEventListener('click', function () {
-          var url = 'https://anmolkapil.github.io/plexo/'
+          var url = 'https://github.com/SheedaMusalli/Plexo-For-Windows'
           var text = document.getElementById('share-text')
           if (navigator.share) {
             navigator.share({ title: 'Plexo', url: url }).catch(function () {})

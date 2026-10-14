@@ -1,6 +1,6 @@
 # Bundled media components
 
-Plexo runs these as separate executables. Their licenses are included beside them in the installed resources/media-tools folder; they do not replace the original Plexo MIT license.
+Plexo runs these as separate executables. Their licenses are included beside them in the installed resources/media-tools folder; they do not replace this project's MIT license.
 
 - yt-dlp 2026.08.19: https://github.com/yt-dlp/yt-dlp/tree/2026.08.19 — its Windows executable includes additional third-party components; see the upstream license notice and source repository.
 - Deno 2.9.7: https://github.com/denoland/deno/tree/v2.9.7 — MIT license.

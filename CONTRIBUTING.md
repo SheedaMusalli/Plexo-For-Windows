@@ -5,9 +5,9 @@ Thanks for taking a look at Plexo. It's a small project, so the process is inten
 ## Setup
 
 ```bash
-git clone https://github.com/anmolkapil/plexo.git
-cd plexo
-npm install
+git clone https://github.com/SheedaMusalli/Plexo-For-Windows.git
+cd Plexo-For-Windows
+npm ci
 npm run dev
 ```
 

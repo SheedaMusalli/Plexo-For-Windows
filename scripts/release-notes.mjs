@@ -2,9 +2,9 @@
 // Builds a GitHub Release from the files in dist/, so the Releases page describes each file the
 // same way the download page does (both use docs/downloads.js).
 //
-//   node scripts/release-notes.mjs v1.0.0-rc.8 [notes.md]   the release body: your notes, then the
+//   node scripts/release-notes.mjs v2.0.1 [notes.md]          the release body: your notes, then the
 //                                                          downloads table
-//   node scripts/release-notes.mjs v1.0.0-rc.8 --files      the files to upload, one per line
+//   node scripts/release-notes.mjs v2.0.1 --files            the files to upload, one per line
 //
 // Only files the download page knows how to describe are included, so update metadata, blockmaps
 // and anything else electron-builder leaves in dist/ never reach a release.
@@ -15,12 +15,12 @@ import { fileURLToPath } from 'node:url'
 
 const { PlexoDownloads: downloads } = createRequire(import.meta.url)('../docs/downloads.js')
 
-const REPO = 'anmolkapil/plexo'
-const SITE = 'https://anmolkapil.github.io/plexo/'
+const REPO = 'SheedaMusalli/Plexo-For-Windows'
+const SITE = 'https://github.com/SheedaMusalli/Plexo-For-Windows/'
 
 const [tag, arg] = process.argv.slice(2)
 if (!tag || !/^v\d/.test(tag)) {
-  console.error('usage: release-notes.mjs <tag, e.g. v1.0.0-rc.8> [notes.md | --files]')
+  console.error('usage: release-notes.mjs <tag, e.g. v2.0.1> [notes.md | --files]')
   process.exit(2)
 }
 

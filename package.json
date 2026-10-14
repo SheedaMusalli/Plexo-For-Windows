@@ -6,7 +6,7 @@
   "author": {
     "name": "Sheeda Musalli"
   },
-  "homepage": "https://github.com/anmolkapil/plexo",
+  "homepage": "https://github.com/SheedaMusalli/Plexo-For-Windows",
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",

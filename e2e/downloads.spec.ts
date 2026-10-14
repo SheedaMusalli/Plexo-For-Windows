@@ -57,7 +57,7 @@ const NOISE = [
   'plexo_1.0.0-rc.7_amd64.snap',
   'Plexo-1.0.0-rc.4-arm64-mac.zip'
 ]
-const BASE = 'https://github.com/anmolkapil/plexo/releases/download/v1.0.0-rc.7/'
+const BASE = 'https://releases.example.test/plexo/v1.0.0-rc.7/'
 const release = (names: string[] = [...SHIPPED, ...NOISE]): unknown => ({
   tag_name: 'v1.0.0-rc.7',
   prerelease: true,
@@ -256,11 +256,11 @@ test.describe('which download is offered', () => {
       size: 100 * 1048576,
       url: BASE + name
     }))
-    const text = D.markdown(files, 'https://anmolkapil.github.io/plexo/')
+    const text = D.markdown(files, 'https://github.com/SheedaMusalli/Plexo-For-Windows/')
     for (const name of SHIPPED) expect(text.split(BASE + name + ')')).toHaveLength(2)
     for (const name of NOISE) expect(text).not.toContain(name)
     expect(text).toContain('[Apple silicon]')
-    expect(text).toContain('https://anmolkapil.github.io/plexo/#downloads')
+    expect(text).toContain('https://github.com/SheedaMusalli/Plexo-For-Windows/#downloads')
     expect(text).toContain('`xattr -dr com.apple.quarantine /Applications/Plexo.app`')
   })
 })
@@ -391,7 +391,7 @@ test.describe('the download page', () => {
       await expect(page.locator('#asset-groups')).toContainText('Couldn’t load the latest release')
       await expect(page.locator('#primary-btn')).toHaveAttribute(
         'href',
-        'https://github.com/anmolkapil/plexo/releases'
+        'https://github.com/SheedaMusalli/Plexo-For-Windows/releases'
       )
     } finally {
       await close()

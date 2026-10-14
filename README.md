@@ -5,7 +5,7 @@
 
 Plexo is a Windows download manager with a Chrome and Edge extension. It can split supported downloads into parallel parts, use selected network connections, resume interrupted transfers, and keep a searchable download history.
 
-**Current release: v2.0.** Download the installer and browser extension from [GitHub Releases](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). Plexo is based on the original [Plexo project by Anmol Kapil](https://github.com/anmolkapil/plexo); the original MIT license is included. The Windows app and browser integration are maintained by Sheeda Musalli.
+**Current release: v2.0.** Download the installer and browser extension from [GitHub Releases](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). Plexo for Windows is developed and maintained by **Sheeda Musalli**.
 
 ## Screenshots
 
@@ -91,6 +91,6 @@ npm run test:e2e:smoke
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development and test notes, and [VALIDATION.md](VALIDATION.md) for the release validation record.
 
-## Credits and license
+## License and maintainer
 
-Plexo is based on the MIT-licensed work of [Anmol Kapil](https://github.com/anmolkapil/plexo). The Windows release and its browser integration are maintained by **Sheeda Musalli**. See [LICENSE](LICENSE) for license terms.
+Plexo is maintained by **Sheeda Musalli** and distributed under the MIT License. See [LICENSE](LICENSE) for the complete license and required notices.
