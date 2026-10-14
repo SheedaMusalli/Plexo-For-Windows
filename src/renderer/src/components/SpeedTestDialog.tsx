@@ -23,12 +23,15 @@ interface TestSession {
   cancelled: boolean
   paused: boolean
   pauseGeneration: number
-  controller: AbortController | null
+  pauseStartedAt: number | null
+  pausedTotalMs: number
+  controllers: Set<AbortController>
   resume: (() => void) | null
 }
 
 const WARMUP_BYTES = 250_000
-const MAX_SAMPLE_BYTES = 12_000_000
+const STREAMS_PER_SAMPLE = 4
+const MAX_BYTES_PER_STREAM = 8_000_000
 const SAMPLES_PER_DIRECTION = 3
 let requestSequence = 0
 const uploadPayloads = new Map<number, string>()
@@ -60,16 +63,6 @@ function median(values: number[]): number | undefined {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
-function readServerDuration(header: string | null): number {
-  if (!header) return 0
-  const requestDuration = header.match(/(?:^|,\s*)cfRequest(?:uest)?Duration;\s*dur=([0-9.]+)/i)
-  if (requestDuration && Number(requestDuration[1]) > 0) return Number(requestDuration[1])
-  return [...header.matchAll(/(?:^|,\s*)cfSpeed[a-zA-Z]*;\s*dur=([0-9.]+)/gi)].reduce(
-    (total, match) => total + Number(match[1]),
-    0
-  )
-}
-
 function getUploadPayload(bytes: number): string {
   let payload = uploadPayloads.get(bytes)
   if (!payload) {
@@ -98,7 +91,7 @@ async function measureRequest(
     await waitUntilResumed(session)
     const controller = new AbortController()
     const pauseGeneration = session.pauseGeneration
-    session.controller = controller
+    session.controllers.add(controller)
     const startedAt = performance.now()
     const url = new URL(
       direction === 'download'
@@ -119,11 +112,9 @@ async function measureRequest(
       if (!response.ok) throw new Error(`Cloudflare returned HTTP ${response.status}.`)
       const body = await response.arrayBuffer()
       const elapsedMs = performance.now() - startedAt
-      const serverMs = Math.min(
-        readServerDuration(response.headers.get('server-timing')),
-        elapsedMs * 0.8
-      )
-      const durationMs = Math.max(1, elapsedMs - serverMs)
+      // Measure the complete network operation. Server-Timing describes work inside
+      // Cloudflare and cannot be subtracted from elapsed time to estimate bandwidth.
+      const durationMs = Math.max(1, elapsedMs)
       const transferredBytes = direction === 'upload' ? bytes : body.byteLength
       if (bytes > 0 && transferredBytes <= 0) {
         throw new Error('Cloudflare returned an empty speed-test sample.')
@@ -134,8 +125,27 @@ async function measureRequest(
       if (session.paused || session.pauseGeneration !== pauseGeneration) continue
       throw reason instanceof Error ? reason : new Error('The speed-test request failed.')
     } finally {
-      if (session.controller === controller) session.controller = null
+      session.controllers.delete(controller)
     }
+  }
+}
+
+async function measureParallelSample(
+  session: TestSession,
+  direction: Direction,
+  bytesPerStream: number
+): Promise<Sample> {
+  const startedAt = performance.now()
+  const pausedAtStart = session.pausedTotalMs
+  const samples = await Promise.all(
+    Array.from({ length: STREAMS_PER_SAMPLE }, () =>
+      measureRequest(session, direction, bytesPerStream)
+    )
+  )
+  return {
+    bytes: samples.reduce((total, sample) => total + sample.bytes, 0),
+    // Requests overlap, so use wall time for the group instead of summing durations.
+    durationMs: Math.max(1, performance.now() - startedAt - (session.pausedTotalMs - pausedAtStart))
   }
 }
 
@@ -191,7 +201,7 @@ export function SpeedTestDialog({
   const cancelSession = (session = sessionRef.current): void => {
     if (!session) return
     session.cancelled = true
-    session.controller?.abort('Plexo cancelled')
+    session.controllers.forEach((controller) => controller.abort('Plexo cancelled'))
     session.resume?.()
     if (sessionRef.current === session) sessionRef.current = null
   }
@@ -237,16 +247,27 @@ export function SpeedTestDialog({
       updateIfCurrent(session, () => setPhase(direction))
       const warmup = await measureRequest(session, direction, WARMUP_BYTES)
       const initialSpeed = (warmup.bytes * 8 * 1000) / warmup.durationMs
-      const sampleBytes = Math.round(
-        Math.min(MAX_SAMPLE_BYTES, Math.max(WARMUP_BYTES, (initialSpeed / 8) * 1.25))
+      // Four simultaneous requests use the available bandwidth more effectively than
+      // one short request. Size each stream for roughly a second of the warm-up rate,
+      // with a strict per-stream cap to keep the test's data use bounded.
+      let sampleBytes = Math.round(
+        Math.min(
+          MAX_BYTES_PER_STREAM,
+          Math.max(WARMUP_BYTES, initialSpeed / 8 / STREAMS_PER_SAMPLE)
+        )
       )
       const samples: Sample[] = []
       for (let index = 0; index < SAMPLES_PER_DIRECTION; index += 1) {
-        samples.push(await measureRequest(session, direction, sampleBytes))
+        samples.push(await measureParallelSample(session, direction, sampleBytes))
         const speed = sampleSpeed(samples)
         updateIfCurrent(session, () =>
           setMetrics((previous) => ({ ...previous, [direction]: speed }))
         )
+        if (speed) {
+          sampleBytes = Math.round(
+            Math.min(MAX_BYTES_PER_STREAM, Math.max(WARMUP_BYTES, speed / 8 / STREAMS_PER_SAMPLE))
+          )
+        }
       }
     }
 
@@ -262,7 +283,9 @@ export function SpeedTestDialog({
       cancelled: false,
       paused: false,
       pauseGeneration: 0,
-      controller: null,
+      pauseStartedAt: null,
+      pausedTotalMs: 0,
+      controllers: new Set(),
       resume: null
     }
     sessionRef.current = session
@@ -288,10 +311,15 @@ export function SpeedTestDialog({
     if (!session.paused) {
       session.paused = true
       session.pauseGeneration += 1
-      session.controller?.abort('Plexo paused')
+      session.pauseStartedAt = performance.now()
+      session.controllers.forEach((controller) => controller.abort('Plexo paused'))
       setStatus('paused')
     } else {
       session.paused = false
+      if (session.pauseStartedAt !== null) {
+        session.pausedTotalMs += performance.now() - session.pauseStartedAt
+        session.pauseStartedAt = null
+      }
       session.resume?.()
       setStatus('running')
     }

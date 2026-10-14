@@ -57,8 +57,14 @@ test.describe('UI journeys @smoke', () => {
   test('shows measured speed results after download and upload samples complete', async ({
     plexo
   }) => {
+    let inFlight = 0
+    let maxInFlight = 0
     await plexo.page.route('https://speed.cloudflare.com/**', async (route) => {
       const bytes = Number(new URL(route.request().url()).searchParams.get('bytes') ?? 0)
+      if (bytes > 100_000) {
+        inFlight += 1
+        maxInFlight = Math.max(maxInFlight, inFlight)
+      }
       await new Promise((resolve) => setTimeout(resolve, bytes > 100_000 ? 1_050 : 40))
       await route.fulfill({
         status: 200,
@@ -71,6 +77,7 @@ test.describe('UI journeys @smoke', () => {
         },
         body: route.request().method() === 'GET' ? Buffer.alloc(bytes) : ''
       })
+      if (bytes > 100_000) inFlight -= 1
     })
     const page = plexo.page
     await page.getByRole('button', { name: 'Settings' }).click()
@@ -82,6 +89,7 @@ test.describe('UI journeys @smoke', () => {
     await expect(dialog.getByLabel('Jitter result')).not.toHaveText('—')
     await expect(dialog.getByLabel('Download result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
     await expect(dialog.getByLabel('Upload result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
+    expect(maxInFlight).toBeGreaterThanOrEqual(4)
   })
 
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
