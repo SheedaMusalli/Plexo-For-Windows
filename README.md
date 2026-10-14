@@ -3,72 +3,54 @@
 [![Latest release](https://img.shields.io/github/v/release/SheedaMusalli/Plexo-For-Windows)](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Plexo is a Windows download manager with a Chrome and Edge companion extension. It can split a supported download into parallel parts and route those requests through the network connections you select, then assemble them into one file.
+Plexo is a Windows download manager with a Chrome and Edge extension. It can split supported downloads into parallel parts, use selected network connections, resume interrupted transfers, and keep a searchable download history.
 
-This repository contains the Windows x64 release and its source. Plexo is based on the original [Plexo project by Anmol Kapil](https://github.com/anmolkapil/plexo); its MIT license is included. This Windows build and its browser integration are maintained by Sheeda Musalli.
+**Current release: v2.0.** Download the installer and browser extension from [GitHub Releases](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). Plexo is based on the original [Plexo project by Anmol Kapil](https://github.com/anmolkapil/plexo); the original MIT license is included. The Windows app and browser integration are maintained by Sheeda Musalli.
 
-![Plexo download screen](docs/screenshots/links.png)
+## Screenshots
 
-## Download Plexo
+![Plexo v2 download history, completed and paused downloads, and transfer speed summary](docs/screenshots/history-v2.png)
 
-Get the latest installer and companion extension from the [GitHub Releases page](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). The first public release includes:
+![Plexo Internet speed test with duration selection and combined-network mode](docs/screenshots/speed-test-v2.png)
 
-- **Windows installer** — installs the Plexo desktop app and browser native-messaging helper.
-- **Chrome extension CRX and ZIP** — the ZIP is the recommended way to install this privately distributed extension.
-- **Source archive** and **SHA-256 checksums** for the release files.
+![Plexo sequential download queue and optional start time](docs/screenshots/queue-v2.png)
 
-The installer is not Authenticode-signed with a publisher certificate, so Windows may show an unknown-publisher or SmartScreen warning. The CRX package signature does not mean the extension is published or approved by the Chrome Web Store.
+## Download and install
 
-## Install the desktop app and extension
+1. Open the [latest release](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest) and download `plexo-2.0.0-setup.exe`. Run it to install the Windows x64 app and register its browser helper for your Windows account.
+2. Download `Plexo.Chrome.Extension.zip` from that same release and extract it into a permanent folder.
+3. In Chrome, open `chrome://extensions`; in Edge, open `edge://extensions`. Turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
+4. Pin **Plexo Download Manager** from the browser Extensions menu. Open the extension popup and confirm it says **Connected**. If you updated Plexo, use **Reload** on the extensions page and refresh existing website tabs.
+5. Start a supported download from a webpage, use **Download with Plexo** on a direct link, or paste a direct URL into the desktop app. Plexo asks before adding captured downloads to its queue.
 
-1. Download and run the Plexo Windows installer.
-2. Download the `Plexo-Chrome-…zip` release asset and extract it to a folder you plan to keep.
-3. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge, turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
-4. Pin **Plexo Download Manager** from the browser’s Extensions menu. Open its popup and check that it says **Connected**.
-5. Use a supported direct download link or a direct media control on a page. Plexo asks before accepting a browser download and shows the transfer in the desktop app.
+The release also includes `Plexo.Chrome.Extension.crx`, the installer update metadata, a blockmap, and `SHA256SUMS.txt`. Chrome and Edge generally restrict extensions installed outside their stores; if CRX installation is blocked, use the ZIP with **Load unpacked**. The supplied extension is the selected `1.0.0-browser.9` build and is not published on the Chrome Web Store. Keep the extracted extension folder in place so the browser can load it.
 
-Chromium browsers restrict installation of most extensions outside their official stores. If your browser refuses the CRX file, install the ZIP with **Load unpacked** as described above. Keep the extracted folder in place; the browser loads the extension from that folder.
+Windows may show an unknown-publisher or SmartScreen warning because the installer is not Authenticode-signed with a publisher certificate. The CRX package signature does not mean the extension is store-published or store-approved.
 
-## What Plexo does
+## Features
 
-- **Parallel downloads across selected networks.** Plexo can use separate Internet connections—such as home Wi-Fi and mobile tethering—to fetch parts of the same file. Servers that support HTTP range requests can use multiple streams; other servers fall back to a single stream.
-- **Adaptive transfer and recovery.** Workers share a queue of file ranges, retry temporary failures, and can pause and resume. An interrupted desktop download is restored as paused when Plexo starts again.
-- **Browser handoff.** The extension can capture supported direct downloads, offer a context-menu action for links, and show controls next to directly downloadable audio or video. The original browser download remains the fallback when Plexo cannot accept a link.
-- **YouTube format selection.** On supported YouTube pages, the extension can show available video qualities. Plexo downloads the selected media through its desktop transfer engine and combines video and audio when needed. The final video uses the video title as its filename.
-- **One-time scheduling and sequential batches.** Add one or more direct links in the desktop app, optionally choose a start time, and Plexo processes the batch in order. You can review and cancel queued items. Plexo must remain open and the PC must be awake when the scheduled time arrives.
-- **Transfer visibility.** See speed, progress, network contribution, and stream activity; open a finished file or reveal it in Explorer. Plexo also includes light and dark themes and network-name/color settings.
+- **Download library:** Search and filter all, finished, and unfinished downloads. Double-click a completed item to open it; right-click for file actions and download details. The status bar shows the latest download’s peak and average speed.
+- **Parallel transfers:** Split supported files across multiple streams and selected network connections. Plexo assembles the parts into one file and displays progress, speed, and network contribution.
+- **Pause and recovery:** Pause, resume, or cancel transfers. Interrupted desktop downloads can be recovered when Plexo starts again.
+- **Browser handoff:** Capture supported direct downloads or send a direct link from the extension. Plexo prompts before accepting the download; when it cannot accept a browser download, the browser remains the fallback.
+- **YouTube:** On supported YouTube pages, choose an available quality and confirm before Plexo transfers the media. Plexo uses its own download engine for the media streams and combines separate audio and video locally when needed. Access depends on video availability, region, and YouTube’s current session or bot checks.
+- **Queue and scheduling:** Add multiple direct URLs and Plexo processes them sequentially. Optionally set a one-time start time. Plexo must remain open and the PC awake when a scheduled item is due.
+- **Internet speed test:** Run a real internet test against Cloudflare or select a combined-network test. Choose a measurement duration from the dialog. A test transfers data; pause other downloads for a more representative result.
+- **Desktop controls:** Choose a save folder, switch light/dark themes, check for updates, and keep Plexo in the Windows system tray.
 
-![Plexo download progress](docs/screenshots/downloading.png)
+## Compatibility
 
-![Plexo completed download](docs/screenshots/complete.png)
+Plexo is designed for direct HTTP or HTTPS GET downloads. Multiple streams require a server that supports byte-range requests; requests through multiple interfaces also depend on Windows routing and the server’s policies. Separate Internet connections are needed to combine independent routes. Wi-Fi and Ethernet connected to the same router generally use the same broadband connection.
 
-## When multiple networks help
+Plexo does not promise full IDM/FDM compatibility with every website. Login challenges, anti-bot checks, expired or single-use links, DRM-protected media, HLS/DASH playlists, `blob:` and `data:` URLs, form/POST-generated downloads, and browser security-blocked downloads may stay in the browser or be unsupported. Some YouTube videos may not be available to download. A queued URL may expire before Plexo reaches it.
 
-Plexo needs genuinely separate routes to the Internet to combine bandwidth. For example, Wi-Fi through a home router and USB-tethered mobile data can use different connections. Wi-Fi and Ethernet connected to the same router normally share one broadband connection, so selecting both will not make that broadband service faster.
+## Privacy
 
-The result also depends on the download server. It may limit parallel requests, ignore range requests, or cap the total speed. Plexo cannot guarantee a speed increase for every file or network setup.
-
-## Compatibility and limitations
-
-Plexo is designed for direct HTTP or HTTPS file downloads. Support varies by site and link:
-
-- Sign-in pages, anti-bot challenges, expired links, and some cross-site authentication flows may need to stay in the browser.
-- DRM-protected media, HLS/DASH playlists, `blob:` and `data:` links, POST-generated downloads, and private browsing are not supported by the general browser handoff.
-- YouTube access depends on the video, region, and current account/session requirements. Some videos may fail to resolve or download.
-- A scheduled or queued URL can expire before Plexo reaches it.
-- This project does not provide full IDM/FDM compatibility with every website.
-
-For additional Windows setup, privacy, and troubleshooting details, see [WINDOWS-SETUP.md](WINDOWS-SETUP.md). The build and test record is in [VALIDATION.md](VALIDATION.md).
-
-## Privacy and permissions
-
-The browser extension requests broad site access so it can detect supported downloads and direct media on pages. It uses Chrome Native Messaging to communicate with the locally installed Plexo helper; it does not add a web-accessible local HTTP server. Recent request headers can be used to preserve authentication for a matching download, and credentials in Plexo’s persisted browser queue are encrypted with Windows credential storage. Incognito requests are excluded.
-
-YouTube sign-in cookies are only sent for the explicit YouTube retry that asks to use the current browser session. They are used for metadata resolution and are not stored in the download queue. See [WINDOWS-SETUP.md](WINDOWS-SETUP.md#privacy-and-local-storage) for the detailed data flow.
+The browser extension requests access to sites so it can detect supported downloads and direct media. It communicates with the installed desktop app through Chrome Native Messaging and a local Windows named pipe; Plexo does not add a local HTTP listener or external backend. Incognito requests are excluded. Recent request headers can preserve authentication for matching downloads, and credentials stored with queued or resumable downloads use Windows credential protection. YouTube cookies are sent only for the explicit retry that uses the current browser session, are used for metadata resolution, and are removed from the temporary cookie file after the request. See [WINDOWS-SETUP.md](WINDOWS-SETUP.md#privacy-and-local-storage) for details.
 
 ## Build from source
 
-The published installer targets Windows x64. To build it yourself, use Windows 10 or 11, Node.js 22.12 or newer, npm, and Windows PowerShell. The Windows build also compiles the browser helper and prepares the media tools used by YouTube downloads.
+Use Windows 10 or 11, Node.js 22.12 or newer, npm, and Windows PowerShell.
 
 ```powershell
 git clone https://github.com/SheedaMusalli/Plexo-For-Windows.git
@@ -77,15 +59,15 @@ npm ci
 npm run dev
 ```
 
-To create the Windows installer and browser extension packages:
+Build the Windows installer and browser extension packages with:
 
 ```powershell
 npm run build:win
 ```
 
-Build artifacts are written to `release/`. See [THIRD-PARTY-MEDIA.md](THIRD-PARTY-MEDIA.md) for bundled media-tool sources and licenses. Preserve the local `.signing/extension.pem` key if you rebuild and want to keep the same extension ID; do not publish that private key.
+Build artifacts are written to `release/`. The build compiles the browser helper and prepares the media tools used for YouTube downloads. See [THIRD-PARTY-MEDIA.md](THIRD-PARTY-MEDIA.md) for component sources and licenses. Preserve `.signing/extension.pem` locally if you rebuild and need to keep the existing extension ID; never publish that private key.
 
-## Checks
+Run the project checks with:
 
 ```powershell
 npm run lint
@@ -93,8 +75,8 @@ npm run typecheck
 npm run test:e2e:smoke
 ```
 
-The browser integration tests use an isolated extension profile and native host. To run them against Microsoft Edge, set `PLEXO_TEST_BROWSER` to the Edge executable path before running the relevant Playwright tests. See [CONTRIBUTING.md](CONTRIBUTING.md) for test and development notes.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and test notes, and [VALIDATION.md](VALIDATION.md) for the release validation record.
 
 ## Credits and license
 
-Plexo is based on the MIT-licensed work of [Anmol Kapil](https://github.com/anmolkapil/plexo). This Windows release and its browser integration are maintained by **Sheeda Musalli**. See [LICENSE](LICENSE) for license terms.
+Plexo is based on the MIT-licensed work of [Anmol Kapil](https://github.com/anmolkapil/plexo). The Windows release and its browser integration are maintained by **Sheeda Musalli**. See [LICENSE](LICENSE) for license terms.
