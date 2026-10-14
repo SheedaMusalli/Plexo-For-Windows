@@ -1,4 +1,3 @@
-import SpeedTest, { type MeasurementSummary } from '@cloudflare/speedtest'
 import { Activity, Gauge, Pause, Play, RotateCcw, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Button } from './ui/button'
@@ -6,30 +5,144 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 
 type TestStatus = 'ready' | 'running' | 'paused' | 'complete' | 'error'
 type TestPhase = 'latency' | 'download' | 'upload' | 'complete'
+type Direction = 'download' | 'upload'
 
-const TEST_MEASUREMENTS = [
-  { type: 'latency', numPackets: 10 },
-  { type: 'download', bytes: 100_000, count: 3, bypassMinDuration: true },
-  { type: 'download', bytes: 1_000_000, count: 3 },
-  { type: 'download', bytes: 10_000_000, count: 3 },
-  { type: 'download', bytes: 25_000_000, count: 2 },
-  { type: 'latency', numPackets: 10 },
-  { type: 'upload', bytes: 100_000, count: 3, bypassMinDuration: true },
-  { type: 'upload', bytes: 1_000_000, count: 3 },
-  { type: 'upload', bytes: 10_000_000, count: 3 },
-  { type: 'upload', bytes: 25_000_000, count: 2 }
-] as const
+interface Metrics {
+  ping?: number
+  jitter?: number
+  download?: number
+  upload?: number
+}
+
+interface Sample {
+  bytes: number
+  durationMs: number
+}
+
+interface TestSession {
+  cancelled: boolean
+  paused: boolean
+  pauseGeneration: number
+  controller: AbortController | null
+  resume: (() => void) | null
+}
+
+const WARMUP_BYTES = 250_000
+const MAX_SAMPLE_BYTES = 12_000_000
+const SAMPLES_PER_DIRECTION = 3
+let requestSequence = 0
+const uploadPayloads = new Map<number, string>()
 
 function formatSpeed(bitsPerSecond: number | undefined): string {
-  if (bitsPerSecond === undefined || !Number.isFinite(bitsPerSecond)) return '—'
+  if (typeof bitsPerSecond !== 'number' || !Number.isFinite(bitsPerSecond) || bitsPerSecond <= 0)
+    return '—'
   const mbps = bitsPerSecond / 1_000_000
+  if (mbps < 0.05) return '<0.1 Mbps'
   return mbps >= 1000 ? `${(mbps / 1000).toFixed(2)} Gbps` : `${mbps.toFixed(1)} Mbps`
 }
 
-function formatLatency(milliseconds: number | undefined): string {
-  return milliseconds === undefined || !Number.isFinite(milliseconds)
-    ? '—'
-    : `${Math.round(milliseconds)} ms`
+function formatLatency(milliseconds: number | null | undefined): string {
+  if (typeof milliseconds !== 'number' || !Number.isFinite(milliseconds) || milliseconds <= 0)
+    return '—'
+  if (milliseconds < 1) return '<1 ms'
+  return `${Math.round(milliseconds)} ms`
+}
+
+function formatJitter(milliseconds: number | undefined): string {
+  if (milliseconds === 0) return '0 ms'
+  return formatLatency(milliseconds)
+}
+
+function median(values: number[]): number | undefined {
+  if (values.length === 0) return undefined
+  const sorted = [...values].sort((a, b) => a - b)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+}
+
+function readServerDuration(header: string | null): number {
+  if (!header) return 0
+  const requestDuration = header.match(/(?:^|,\s*)cfRequest(?:uest)?Duration;\s*dur=([0-9.]+)/i)
+  if (requestDuration && Number(requestDuration[1]) > 0) return Number(requestDuration[1])
+  return [...header.matchAll(/(?:^|,\s*)cfSpeed[a-zA-Z]*;\s*dur=([0-9.]+)/gi)].reduce(
+    (total, match) => total + Number(match[1]),
+    0
+  )
+}
+
+function getUploadPayload(bytes: number): string {
+  let payload = uploadPayloads.get(bytes)
+  if (!payload) {
+    payload = '0'.repeat(bytes)
+    uploadPayloads.set(bytes, payload)
+  }
+  return payload
+}
+
+async function waitUntilResumed(session: TestSession): Promise<void> {
+  while (session.paused && !session.cancelled) {
+    await new Promise<void>((resolve) => {
+      session.resume = resolve
+    })
+    session.resume = null
+  }
+  if (session.cancelled) throw new Error('Speed test cancelled')
+}
+
+async function measureRequest(
+  session: TestSession,
+  direction: Direction,
+  bytes: number
+): Promise<Sample> {
+  while (true) {
+    await waitUntilResumed(session)
+    const controller = new AbortController()
+    const pauseGeneration = session.pauseGeneration
+    session.controller = controller
+    const startedAt = performance.now()
+    const url = new URL(
+      direction === 'download'
+        ? 'https://speed.cloudflare.com/__down'
+        : 'https://speed.cloudflare.com/__up'
+    )
+    url.searchParams.set('bytes', String(bytes))
+    url.searchParams.set('plexo', String(++requestSequence))
+
+    try {
+      const response = await fetch(url, {
+        cache: 'no-store',
+        signal: controller.signal,
+        ...(direction === 'upload' && bytes > 0
+          ? { method: 'POST', body: getUploadPayload(bytes) }
+          : {})
+      })
+      if (!response.ok) throw new Error(`Cloudflare returned HTTP ${response.status}.`)
+      const body = await response.arrayBuffer()
+      const elapsedMs = performance.now() - startedAt
+      const serverMs = Math.min(
+        readServerDuration(response.headers.get('server-timing')),
+        elapsedMs * 0.8
+      )
+      const durationMs = Math.max(1, elapsedMs - serverMs)
+      const transferredBytes = direction === 'upload' ? bytes : body.byteLength
+      if (bytes > 0 && transferredBytes <= 0) {
+        throw new Error('Cloudflare returned an empty speed-test sample.')
+      }
+      return { bytes: transferredBytes, durationMs }
+    } catch (reason) {
+      if (session.cancelled) throw new Error('Speed test cancelled')
+      if (session.paused || session.pauseGeneration !== pauseGeneration) continue
+      throw reason instanceof Error ? reason : new Error('The speed-test request failed.')
+    } finally {
+      if (session.controller === controller) session.controller = null
+    }
+  }
+}
+
+function sampleSpeed(samples: Sample[]): number | undefined {
+  const bytes = samples.reduce((total, sample) => total + sample.bytes, 0)
+  const durationMs = samples.reduce((total, sample) => total + sample.durationMs, 0)
+  return bytes > 0 && durationMs > 0 ? (bytes * 8 * 1000) / durationMs : undefined
 }
 
 function Metric({
@@ -39,15 +152,16 @@ function Metric({
 }: {
   label: string
   value: string
-  tone?: 'download' | 'upload'
+  tone?: Direction
 }): React.JSX.Element {
   return (
     <div className="min-w-0 rounded-lg border border-border bg-card p-3">
       <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
         {label}
       </div>
-      <div
-        className={`mt-1 truncate font-mono text-lg font-semibold ${
+      <output
+        aria-label={`${label} result`}
+        className={`mt-1 block truncate font-mono text-lg font-semibold ${
           tone === 'download'
             ? 'text-[var(--color-wifi)]'
             : tone === 'upload'
@@ -56,7 +170,7 @@ function Metric({
         }`}
       >
         {value}
-      </div>
+      </output>
     </div>
   )
 }
@@ -68,16 +182,23 @@ export function SpeedTestDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }): React.JSX.Element {
-  const engineRef = useRef<SpeedTest | null>(null)
+  const sessionRef = useRef<TestSession | null>(null)
   const [status, setStatus] = useState<TestStatus>('ready')
   const [phase, setPhase] = useState<TestPhase>('latency')
-  const [metrics, setMetrics] = useState<MeasurementSummary>({})
+  const [metrics, setMetrics] = useState<Metrics>({})
   const [error, setError] = useState<string | null>(null)
+
+  const cancelSession = (session = sessionRef.current): void => {
+    if (!session) return
+    session.cancelled = true
+    session.controller?.abort('Plexo cancelled')
+    session.resume?.()
+    if (sessionRef.current === session) sessionRef.current = null
+  }
 
   const close = (nextOpen: boolean): void => {
     if (!nextOpen) {
-      engineRef.current?.pause()
-      engineRef.current = null
+      cancelSession()
       setStatus('ready')
       setPhase('latency')
       setMetrics({})
@@ -86,59 +207,98 @@ export function SpeedTestDialog({
     onOpenChange(nextOpen)
   }
 
+  const updateIfCurrent = (session: TestSession, update: () => void): void => {
+    if (sessionRef.current === session && !session.cancelled) update()
+  }
+
+  const run = async (session: TestSession): Promise<void> => {
+    const pingSamples: number[] = []
+    updateIfCurrent(session, () => setPhase('latency'))
+    for (let index = 0; index < 6; index += 1) {
+      const sample = await measureRequest(session, 'download', 0)
+      // Ignore the first connection setup so ping is based on a warmed-up route.
+      if (index > 0) pingSamples.push(sample.durationMs)
+      updateIfCurrent(session, () => {
+        setMetrics((previous) => ({
+          ...previous,
+          ping: median(pingSamples),
+          jitter:
+            pingSamples.length > 1
+              ? pingSamples
+                  .slice(1)
+                  .reduce((total, value, i) => total + Math.abs(value - pingSamples[i]), 0) /
+                (pingSamples.length - 1)
+              : undefined
+        }))
+      })
+    }
+
+    for (const direction of ['download', 'upload'] as const) {
+      updateIfCurrent(session, () => setPhase(direction))
+      const warmup = await measureRequest(session, direction, WARMUP_BYTES)
+      const initialSpeed = (warmup.bytes * 8 * 1000) / warmup.durationMs
+      const sampleBytes = Math.round(
+        Math.min(MAX_SAMPLE_BYTES, Math.max(WARMUP_BYTES, (initialSpeed / 8) * 1.25))
+      )
+      const samples: Sample[] = []
+      for (let index = 0; index < SAMPLES_PER_DIRECTION; index += 1) {
+        samples.push(await measureRequest(session, direction, sampleBytes))
+        const speed = sampleSpeed(samples)
+        updateIfCurrent(session, () =>
+          setMetrics((previous) => ({ ...previous, [direction]: speed }))
+        )
+      }
+    }
+
+    updateIfCurrent(session, () => {
+      setPhase('complete')
+      setStatus('complete')
+    })
+  }
+
   const start = (): void => {
-    engineRef.current?.pause()
+    cancelSession()
+    const session: TestSession = {
+      cancelled: false,
+      paused: false,
+      pauseGeneration: 0,
+      controller: null,
+      resume: null
+    }
+    sessionRef.current = session
     setStatus('running')
     setPhase('latency')
     setMetrics({})
     setError(null)
-
-    const engine = new SpeedTest({
-      autoStart: false,
-      logMeasurementApiUrl: null,
-      logAimApiUrl: null,
-      measurements: [...TEST_MEASUREMENTS],
-      measureDownloadLoadedLatency: true,
-      measureUploadLoadedLatency: true
-    })
-    engineRef.current = engine
-
-    engine.onPhaseChange = ({ measurement }) => {
-      if (engineRef.current !== engine) return
-      if (measurement.type === 'latency') setPhase('latency')
-      else if (measurement.type === 'download') setPhase('download')
-      else if (measurement.type === 'upload') setPhase('upload')
-    }
-    engine.onResultsChange = () => {
-      if (engineRef.current === engine) setMetrics(engine.results.getSummary())
-    }
-    engine.onRunningChange = (running) => {
-      if (engineRef.current === engine) setStatus(running ? 'running' : 'paused')
-    }
-    engine.onFinish = (results) => {
-      if (engineRef.current !== engine) return
-      setMetrics(results.getSummary())
-      setPhase('complete')
-      setStatus('complete')
-      engineRef.current = null
-    }
-    engine.onError = () => {
-      if (engineRef.current !== engine) return
-      setError('Cloudflare could not complete the speed test. Check your connection and try again.')
+    void run(session).catch((reason: unknown) => {
+      if (session.cancelled || sessionRef.current !== session) return
       setStatus('error')
-      engineRef.current = null
-    }
-    engine.play()
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Cloudflare could not complete the speed test. Check your connection and try again.'
+      )
+      sessionRef.current = null
+    })
   }
 
   const pauseOrResume = (): void => {
-    if (status === 'running') engineRef.current?.pause()
-    else if (status === 'paused') engineRef.current?.play()
+    const session = sessionRef.current
+    if (!session) return
+    if (!session.paused) {
+      session.paused = true
+      session.pauseGeneration += 1
+      session.controller?.abort('Plexo paused')
+      setStatus('paused')
+    } else {
+      session.paused = false
+      session.resume?.()
+      setStatus('running')
+    }
   }
 
   const cancel = (): void => {
-    engineRef.current?.pause()
-    engineRef.current = null
+    cancelSession()
     setStatus('ready')
     setPhase('latency')
     setMetrics({})
@@ -165,7 +325,7 @@ export function SpeedTestDialog({
       ? formatSpeed(metrics.download)
       : phase === 'upload'
         ? formatSpeed(metrics.upload)
-        : formatLatency(metrics.latency)
+        : formatLatency(metrics.ping)
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -259,8 +419,8 @@ export function SpeedTestDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
-            <Metric label="Ping" value={formatLatency(metrics.latency)} />
-            <Metric label="Jitter" value={formatLatency(metrics.jitter)} />
+            <Metric label="Ping" value={formatLatency(metrics.ping)} />
+            <Metric label="Jitter" value={formatJitter(metrics.jitter)} />
             <Metric label="Download" value={formatSpeed(metrics.download)} tone="download" />
             <Metric label="Upload" value={formatSpeed(metrics.upload)} tone="upload" />
           </div>
@@ -268,7 +428,7 @@ export function SpeedTestDialog({
 
         <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
           The test sends and receives data from Cloudflare, which can see your public IP address.
-          Plexo does not upload test results. A full run can use up to about 167 MB; pause other
+          Plexo does not upload test results. A full run can use up to about 73 MB; pause other
           downloads for the most accurate reading.
         </div>
 

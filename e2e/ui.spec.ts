@@ -36,15 +36,52 @@ test.describe('UI journeys @smoke', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
     await expect(dialog.getByText('Ready when you are')).toBeVisible()
+    await expect(dialog.getByLabel('Ping result')).toHaveText('—')
+    await expect(dialog.getByLabel('Jitter result')).toHaveText('—')
+    await expect(dialog.getByLabel('Download result')).toHaveText('—')
+    await expect(dialog.getByLabel('Upload result')).toHaveText('—')
     expect(requests).toBe(0)
 
     await dialog.getByRole('button', { name: 'Start test' }).click()
     await expect(dialog.getByRole('alert')).toBeVisible()
     await expect.poll(() => requests).toBeGreaterThan(0)
     await expect(dialog.getByRole('button', { name: 'Run again' })).toBeVisible()
+    await expect(dialog.getByLabel('Ping result')).toHaveText('—')
+    await expect(dialog.getByLabel('Download result')).toHaveText('—')
+    await expect(dialog.getByLabel('Upload result')).toHaveText('—')
 
     await dialog.getByRole('button', { name: 'Close' }).click()
     await expect(dialog).toBeHidden()
+  })
+
+  test('shows measured speed results after download and upload samples complete', async ({
+    plexo
+  }) => {
+    await plexo.page.route('https://speed.cloudflare.com/**', async (route) => {
+      const bytes = Number(new URL(route.request().url()).searchParams.get('bytes') ?? 0)
+      await new Promise((resolve) => setTimeout(resolve, bytes > 100_000 ? 1_050 : 40))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        headers: {
+          'access-control-allow-origin': '*',
+          'timing-allow-origin': '*',
+          'access-control-expose-headers': 'Server-Timing',
+          'server-timing': 'cfRequestDuration;dur=10'
+        },
+        body: route.request().method() === 'GET' ? Buffer.alloc(bytes) : ''
+      })
+    })
+    const page = plexo.page
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await page.getByRole('button', { name: 'Test internet speed' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Start test' }).click()
+    await expect(dialog.getByText('Test complete')).toBeVisible({ timeout: 30_000 })
+    await expect(dialog.getByLabel('Ping result')).toHaveText(/\d+ ms|<1 ms/)
+    await expect(dialog.getByLabel('Jitter result')).not.toHaveText('—')
+    await expect(dialog.getByLabel('Download result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
+    await expect(dialog.getByLabel('Upload result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
   })
 
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
@@ -61,6 +98,31 @@ test.describe('UI journeys @smoke', () => {
     await page.getByRole('button', { name: 'Cancel alpha.zip' }).click()
     await expect(page.getByText('Waiting (1)')).toBeVisible()
     await expect(page.getByText('beta.zip')).toBeVisible()
+  })
+
+  test('queue actions stay visible in a short window', async ({ plexo }) => {
+    await plexo.evaluateMain((_electron) => {
+      _electron.BrowserWindow.getAllWindows()[0].setSize(500, 420)
+    }, null)
+    const page = plexo.page
+    await page.getByRole('button', { name: /^Open download queue/ }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(
+      dialog.getByRole('heading', { name: 'Schedule and batch downloads' })
+    ).toBeVisible()
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+    const bounds = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+    })
+    expect(bounds.left).toBeGreaterThanOrEqual(0)
+    expect(bounds.top).toBeGreaterThanOrEqual(0)
+    expect(bounds.right).toBeLessThanOrEqual(viewport.width)
+    expect(bounds.bottom).toBeLessThanOrEqual(viewport.height)
+    await expect(
+      dialog.getByRole('button', { name: 'Close', exact: true }).first()
+    ).toBeInViewport()
+    await expect(dialog.getByRole('button', { name: 'Add to queue' })).toBeInViewport()
   })
 
   test('paste a link, start, pause, resume, finish, reveal the file', async ({
