@@ -6,6 +6,7 @@ import { TitleBar, type TitleBarStatus } from './components/TitleBar'
 import { DownloadConfirmationDialog } from './components/DownloadConfirmationDialog'
 import { DownloadQueueDialog } from './components/DownloadQueueDialog'
 import { SettingsDialog } from './components/SettingsDialog'
+import { SpeedTestDialog } from './components/SpeedTestDialog'
 import { NetworkBindingDialog } from './components/NetworkBindingDialog'
 import { UpdateDialog } from './components/UpdateDialog'
 import { TooltipProvider } from './components/ui/tooltip'
@@ -75,6 +76,7 @@ function App(): React.JSX.Element {
   const [queueCount, setQueueCount] = useState(0)
   const [queueOpen, setQueueOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [speedTestOpen, setSpeedTestOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -179,7 +181,9 @@ function App(): React.JSX.Element {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           onOpenQueue={() => setQueueOpen(true)}
+          onOpenSpeedTest={() => setSpeedTestOpen(true)}
         />
+        <SpeedTestDialog open={speedTestOpen} onOpenChange={setSpeedTestOpen} />
       </div>
     </TooltipProvider>
   )

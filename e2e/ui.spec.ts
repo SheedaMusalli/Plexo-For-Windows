@@ -23,6 +23,32 @@ async function stubNativeUi(
 }
 
 test.describe('UI journeys @smoke', () => {
+  test('load the OpenSpeedTest widget only after the user chooses to', async ({ plexo }) => {
+    const page = plexo.page
+    await page.route('https://openspeedtest.com/speedtest', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<title>Speed test fixture</title>'
+      })
+    )
+
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await page.getByRole('button', { name: 'Test internet speed' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Internet speed test' })).toBeVisible()
+    await expect(page.locator('iframe')).toHaveCount(0)
+
+    await dialog.getByRole('button', { name: 'Load speed test' }).click()
+    const frame = page.locator('iframe[title="OpenSpeedTest internet speed test"]')
+    await expect(frame).toBeVisible()
+    await expect(frame).toHaveAttribute('src', 'https://openspeedtest.com/speedtest')
+    await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
+
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await expect(frame).toHaveCount(0)
+  })
+
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
     const page = plexo.page
     await page.getByRole('button', { name: /^Open download queue/ }).click()
