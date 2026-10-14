@@ -1,10 +1,10 @@
 # Plexo for Windows + Chrome
 
-Custom build: **1.0.0-browser.9**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
+Custom build: **2.0.0**, Windows x64. Based on the supplied Plexo source by Anmol Kapil; the original MIT license is retained. The desktop interface remains Electron, as requested. The browser helper is a compiled Windows .NET executable.
 
 ## Update an existing installation
 
-Run the new **Plexo-Windows-Setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.1** and app version **1.0.0-browser.9**.
+Run the new **Plexo-2.0.0-setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.1** and app version **2.0.0**.
 
 ## YouTube
 
