@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises'
 import {
   clipboard,
+  app,
   dialog,
   ipcMain,
   nativeTheme,
@@ -20,7 +21,7 @@ import { measureLatencies } from '../network/latency'
 import { NetworkMonitor } from '../network/interfaces'
 import { loadSettings, saveSettings } from '../settings'
 import { testKnobs } from '../testKnobs'
-import { UPDATE_PAGE_URL } from '../updateCheck'
+import { checkForUpdate, UPDATE_PAGE_URL } from '../updateCheck'
 
 async function openNetworkSettings(): Promise<void> {
   if (process.platform === 'win32') {
@@ -198,18 +199,12 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
 
   handle('removeDownload', async (_event, id) => manager.remove(id))
 
-  // Updates for this custom build are installed manually. Retain the test-only banner override.
-  const updateCheckPromise = (async () => {
-    const info = testKnobs.forceUpdateVersion
-      ? { version: testKnobs.forceUpdateVersion, url: UPDATE_PAGE_URL }
-      : null // This custom Windows build must not offer upstream releases without its browser bridge.
-    return info
-  })()
-
   // Dismissal is read per call, not cached with the check — a reload after "Not now" must not
   // bring the dialog back.
   handle('checkForUpdate', async () => {
-    const info = await updateCheckPromise
+    const info = testKnobs.forceUpdateVersion
+      ? { version: testKnobs.forceUpdateVersion, url: UPDATE_PAGE_URL }
+      : await checkForUpdate(app.getVersion())
     if (!info) return null
     const { dismissedUpdateVersion } = await loadSettings()
     return { ...info, dismissed: info.version === dismissedUpdateVersion }

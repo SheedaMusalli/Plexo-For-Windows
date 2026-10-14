@@ -92,6 +92,15 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     checkForUpdate()
+    const timer = window.setInterval(() => checkForUpdate(), 6 * 60 * 60 * 1000)
+    const onFocus = (): void => {
+      void checkForUpdate()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [checkForUpdate])
 
   const handleNewDownload = (): void => {
