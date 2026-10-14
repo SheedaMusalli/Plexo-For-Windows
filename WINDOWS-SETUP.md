@@ -98,4 +98,3 @@ node scripts/verify-extension.cjs
 ```
 
 Browser integration tests use separately compiled test helpers and randomly named host registrations and pipes, so they do not redirect your installed extension. The YouTube test requires internet access and uses a public test video. The remaining inherited tests and their fixtures are included in the source. Some multi-network tests require a second usable network interface.
-
