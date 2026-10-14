@@ -38,7 +38,7 @@ export function TitleBar({
       style={
         window.plexo.platform === 'win32'
           ? {
-              paddingLeft: 'env(titlebar-area-x, 14px)',
+              paddingLeft: 'calc(env(titlebar-area-x, 0px) + 16px)',
               paddingRight:
                 'calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%))'
             }
