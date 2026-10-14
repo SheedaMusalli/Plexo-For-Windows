@@ -4,7 +4,7 @@ Custom build: **2.0.0**, Windows x64. Based on the supplied Plexo source by Anmo
 
 ## Update an existing installation
 
-Run the new **Plexo-2.0.0-setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.1** and app version **2.0.0**.
+Run the new **plexo-2.0.0-setup.exe**. Replace the contents of the folder you previously loaded as an unpacked extension with the new **Plexo-Chrome.zip** contents. At **edge://extensions** or **chrome://extensions**, click **Reload** on Plexo, then refresh your open website tabs. The extension version must be **1.3.1** and app version **2.0.0**.
 
 ## YouTube
 
@@ -98,3 +98,4 @@ node scripts/verify-extension.cjs
 ```
 
 Browser integration tests use separately compiled test helpers and randomly named host registrations and pipes, so they do not redirect your installed extension. The YouTube test requires internet access and uses a public test video. The remaining inherited tests and their fixtures are included in the source. Some multi-network tests require a second usable network interface.
+
