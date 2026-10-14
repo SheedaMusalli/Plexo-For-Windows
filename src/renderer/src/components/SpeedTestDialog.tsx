@@ -32,7 +32,6 @@ interface TestSession {
 const WARMUP_BYTES = 250_000
 const STREAMS_PER_SAMPLE = 4
 const MAX_BYTES_PER_STREAM = 8_000_000
-const SAMPLES_PER_DIRECTION = 3
 let requestSequence = 0
 const uploadPayloads = new Map<number, string>()
 
@@ -70,6 +69,15 @@ function getUploadPayload(bytes: number): string {
     uploadPayloads.set(bytes, payload)
   }
   return payload
+}
+
+function activeElapsedMs(session: TestSession, startedAt: number, pausedAtStart: number): number {
+  const now = performance.now()
+  const pausedDuringSample =
+    session.pausedTotalMs -
+    pausedAtStart +
+    (session.pauseStartedAt === null ? 0 : now - session.pauseStartedAt)
+  return Math.max(0, now - startedAt - pausedDuringSample)
 }
 
 async function waitUntilResumed(session: TestSession): Promise<void> {
@@ -145,7 +153,7 @@ async function measureParallelSample(
   return {
     bytes: samples.reduce((total, sample) => total + sample.bytes, 0),
     // Requests overlap, so use wall time for the group instead of summing durations.
-    durationMs: Math.max(1, performance.now() - startedAt - (session.pausedTotalMs - pausedAtStart))
+    durationMs: Math.max(1, activeElapsedMs(session, startedAt, pausedAtStart))
   }
 }
 
@@ -197,6 +205,8 @@ export function SpeedTestDialog({
   const [phase, setPhase] = useState<TestPhase>('latency')
   const [metrics, setMetrics] = useState<Metrics>({})
   const [error, setError] = useState<string | null>(null)
+  const [durationSeconds, setDurationSeconds] = useState(20)
+  const [progress, setProgress] = useState(0)
 
   const cancelSession = (session = sessionRef.current): void => {
     if (!session) return
@@ -213,6 +223,7 @@ export function SpeedTestDialog({
       setPhase('latency')
       setMetrics({})
       setError(null)
+      setProgress(0)
     }
     onOpenChange(nextOpen)
   }
@@ -221,7 +232,7 @@ export function SpeedTestDialog({
     if (sessionRef.current === session && !session.cancelled) update()
   }
 
-  const run = async (session: TestSession): Promise<void> => {
+  const run = async (session: TestSession, totalDurationSeconds: number): Promise<void> => {
     const pingSamples: number[] = []
     updateIfCurrent(session, () => setPhase('latency'))
     for (let index = 0; index < 6; index += 1) {
@@ -229,6 +240,7 @@ export function SpeedTestDialog({
       // Ignore the first connection setup so ping is based on a warmed-up route.
       if (index > 0) pingSamples.push(sample.durationMs)
       updateIfCurrent(session, () => {
+        setProgress(((index + 1) / 6) * 10)
         setMetrics((previous) => ({
           ...previous,
           ping: median(pingSamples),
@@ -243,8 +255,14 @@ export function SpeedTestDialog({
       })
     }
 
-    for (const direction of ['download', 'upload'] as const) {
-      updateIfCurrent(session, () => setPhase(direction))
+    const directionDurationMs = (totalDurationSeconds * 1000) / 2
+    for (const [directionIndex, direction] of (['download', 'upload'] as const).entries()) {
+      const progressStart = directionIndex === 0 ? 10 : 55
+      const progressSpan = 45
+      updateIfCurrent(session, () => {
+        setPhase(direction)
+        setProgress(progressStart)
+      })
       const warmup = await measureRequest(session, direction, WARMUP_BYTES)
       const initialSpeed = (warmup.bytes * 8 * 1000) / warmup.durationMs
       // Four simultaneous requests use the available bandwidth more effectively than
@@ -257,12 +275,18 @@ export function SpeedTestDialog({
         )
       )
       const samples: Sample[] = []
-      for (let index = 0; index < SAMPLES_PER_DIRECTION; index += 1) {
+      const directionStartedAt = performance.now()
+      const pausedAtDirectionStart = session.pausedTotalMs
+      while (
+        activeElapsedMs(session, directionStartedAt, pausedAtDirectionStart) < directionDurationMs
+      ) {
         samples.push(await measureParallelSample(session, direction, sampleBytes))
         const speed = sampleSpeed(samples)
-        updateIfCurrent(session, () =>
+        updateIfCurrent(session, () => {
+          const elapsed = activeElapsedMs(session, directionStartedAt, pausedAtDirectionStart)
+          setProgress(progressStart + Math.min(1, elapsed / directionDurationMs) * progressSpan)
           setMetrics((previous) => ({ ...previous, [direction]: speed }))
-        )
+        })
         if (speed) {
           sampleBytes = Math.round(
             Math.min(MAX_BYTES_PER_STREAM, Math.max(WARMUP_BYTES, speed / 8 / STREAMS_PER_SAMPLE))
@@ -274,6 +298,7 @@ export function SpeedTestDialog({
     updateIfCurrent(session, () => {
       setPhase('complete')
       setStatus('complete')
+      setProgress(100)
     })
   }
 
@@ -293,7 +318,8 @@ export function SpeedTestDialog({
     setPhase('latency')
     setMetrics({})
     setError(null)
-    void run(session).catch((reason: unknown) => {
+    setProgress(0)
+    void run(session, durationSeconds).catch((reason: unknown) => {
       if (session.cancelled || sessionRef.current !== session) return
       setStatus('error')
       setError(
@@ -331,6 +357,7 @@ export function SpeedTestDialog({
     setPhase('latency')
     setMetrics({})
     setError(null)
+    setProgress(0)
   }
 
   const displayPhase =
@@ -377,6 +404,25 @@ export function SpeedTestDialog({
                 {displayPhase}
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/30 p-3">
+              <div>
+                <div className="text-sm font-medium">Measurement duration</div>
+                <div className="text-xs text-muted-foreground">
+                  Split evenly between download and upload
+                </div>
+              </div>
+              <select
+                aria-label="Speed test duration"
+                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                disabled={status === 'running' || status === 'paused'}
+                value={durationSeconds}
+                onChange={(event) => setDurationSeconds(Number(event.target.value))}
+              >
+                <option value={10}>10 seconds</option>
+                <option value={20}>20 seconds</option>
+                <option value={30}>30 seconds</option>
+              </select>
+            </div>
             <div className="mt-7 flex min-h-36 flex-col items-center justify-center gap-3">
               <div className="font-mono text-4xl font-light tabular-nums sm:text-5xl">
                 {status === 'ready' || status === 'error' ? '—' : mainMetric}
@@ -398,26 +444,11 @@ export function SpeedTestDialog({
                 aria-label="Speed test progress"
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-valuenow={
-                  status === 'complete'
-                    ? 100
-                    : phase === 'upload'
-                      ? 70
-                      : phase === 'download'
-                        ? 35
-                        : 5
-                }
+                aria-valuenow={Math.round(progress)}
               >
                 <div
-                  className={`h-full rounded-full bg-[var(--color-wifi)] transition-[width] duration-500 ${
-                    status === 'complete'
-                      ? 'w-full'
-                      : phase === 'upload'
-                        ? 'w-[70%]'
-                        : phase === 'download'
-                          ? 'w-[35%]'
-                          : 'w-[5%]'
-                  }`}
+                  className="h-full rounded-full bg-[var(--color-wifi)] transition-[width] duration-300"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
@@ -456,8 +487,9 @@ export function SpeedTestDialog({
 
         <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
           The test sends and receives data from Cloudflare, which can see your public IP address.
-          Plexo does not upload test results. A full run can use up to about 73 MB; pause other
-          downloads for the most accurate reading.
+          Plexo does not upload test results. Longer tests transfer more data; usage varies with
+          your connection speed and selected duration. Pause other downloads for the most accurate
+          reading.
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">

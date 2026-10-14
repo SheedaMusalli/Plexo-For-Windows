@@ -57,13 +57,18 @@ test.describe('UI journeys @smoke', () => {
   test('shows measured speed results after download and upload samples complete', async ({
     plexo
   }) => {
+    test.setTimeout(60_000)
     let inFlight = 0
     let maxInFlight = 0
+    let downloadRequests = 0
+    let uploadRequests = 0
     await plexo.page.route('https://speed.cloudflare.com/**', async (route) => {
       const bytes = Number(new URL(route.request().url()).searchParams.get('bytes') ?? 0)
       if (bytes > 100_000) {
         inFlight += 1
         maxInFlight = Math.max(maxInFlight, inFlight)
+        if (route.request().method() === 'GET') downloadRequests += 1
+        else uploadRequests += 1
       }
       await new Promise((resolve) => setTimeout(resolve, bytes > 100_000 ? 1_050 : 40))
       await route.fulfill({
@@ -83,13 +88,20 @@ test.describe('UI journeys @smoke', () => {
     await page.getByRole('button', { name: 'Settings' }).click()
     await page.getByRole('button', { name: 'Test internet speed' }).click()
     const dialog = page.getByRole('dialog')
+    const duration = dialog.getByLabel('Speed test duration')
+    await expect(duration).toHaveValue('20')
+    await duration.selectOption('10')
+    await expect(dialog.getByText('Split evenly between download and upload')).toBeVisible()
     await dialog.getByRole('button', { name: 'Start test' }).click()
+    await expect(duration).toBeDisabled()
     await expect(dialog.getByText('Test complete')).toBeVisible({ timeout: 30_000 })
     await expect(dialog.getByLabel('Ping result')).toHaveText(/\d+ ms|<1 ms/)
     await expect(dialog.getByLabel('Jitter result')).not.toHaveText('—')
     await expect(dialog.getByLabel('Download result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
     await expect(dialog.getByLabel('Upload result')).toHaveText(/\d+(\.\d+)? Mbps|\d+\.\d+ Gbps/)
     expect(maxInFlight).toBeGreaterThanOrEqual(4)
+    expect(downloadRequests).toBeGreaterThanOrEqual(17)
+    expect(uploadRequests).toBeGreaterThanOrEqual(17)
   })
 
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
