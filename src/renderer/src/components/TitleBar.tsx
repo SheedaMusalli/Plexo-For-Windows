@@ -2,7 +2,7 @@ import { ColorBadge } from './ColorBadge'
 import { ThemeToggle } from './ThemeToggle'
 import { UpdateIndicator } from './UpdateIndicator'
 import { Button } from './ui/button'
-import { ListPlus, PanelBottomClose } from 'lucide-react'
+import { ListPlus, PanelBottomClose, Settings2 } from 'lucide-react'
 import plexoLogo from '../../../../extension/icon.png'
 
 export type TitleBarStatus =
@@ -20,11 +20,13 @@ const pillDotClass = 'size-1.5 shrink-0 rounded-full'
 export function TitleBar({
   status,
   queueCount,
-  onOpenQueue
+  onOpenQueue,
+  onOpenSettings
 }: {
   status: TitleBarStatus
   queueCount: number
   onOpenQueue: () => void
+  onOpenSettings: () => void
 }): React.JSX.Element {
   const dimmed = status.kind === 'offline'
 
@@ -113,6 +115,17 @@ export function TitleBar({
       </div>
       <UpdateIndicator />
       <ThemeToggle />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="size-[26px] shrink-0 [-webkit-app-region:no-drag]"
+        onClick={onOpenSettings}
+        aria-label="Settings"
+        title="Settings"
+      >
+        <Settings2 className="size-3.5" />
+      </Button>
       {window.plexo.platform === 'win32' && (
         <Button
           type="button"

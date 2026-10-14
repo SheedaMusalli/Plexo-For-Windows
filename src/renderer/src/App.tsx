@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { TitleBar, type TitleBarStatus } from './components/TitleBar'
 import { DownloadConfirmationDialog } from './components/DownloadConfirmationDialog'
 import { DownloadQueueDialog } from './components/DownloadQueueDialog'
+import { SettingsDialog } from './components/SettingsDialog'
 import { NetworkBindingDialog } from './components/NetworkBindingDialog'
 import { UpdateDialog } from './components/UpdateDialog'
 import { TooltipProvider } from './components/ui/tooltip'
@@ -73,6 +74,7 @@ function App(): React.JSX.Element {
   const [adding, setAdding] = useState(false)
   const [queueCount, setQueueCount] = useState(0)
   const [queueOpen, setQueueOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -158,6 +160,7 @@ function App(): React.JSX.Element {
           status={titleBarStatus}
           queueCount={queueCount}
           onOpenQueue={() => setQueueOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
         {adding && !currentDownload && (
           <button
@@ -172,6 +175,11 @@ function App(): React.JSX.Element {
         <NetworkBindingDialog />
         <DownloadConfirmationDialog />
         <DownloadQueueDialog open={queueOpen} onOpenChange={setQueueOpen} />
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          onOpenQueue={() => setQueueOpen(true)}
+        />
       </div>
     </TooltipProvider>
   )
