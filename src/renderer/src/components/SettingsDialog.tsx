@@ -25,7 +25,7 @@ export function SettingsDialog({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-lg overflow-x-hidden overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="size-4" /> Plexo settings
@@ -61,14 +61,14 @@ export function SettingsDialog({
           <div className="rounded-lg border border-border p-3">
             <div className="mb-2 text-sm font-medium">Internet speed test</div>
             <p className="mb-3 text-xs text-muted-foreground">
-              Measure ping, download, and upload speeds with OpenSpeedTest.
+              Measure your internet ping, download, and upload speeds.
             </p>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 onOpenChange(false)
-                onOpenSpeedTest()
+                window.setTimeout(onOpenSpeedTest, 120)
               }}
             >
               <Gauge /> Test internet speed

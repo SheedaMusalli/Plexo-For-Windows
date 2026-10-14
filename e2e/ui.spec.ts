@@ -23,30 +23,28 @@ async function stubNativeUi(
 }
 
 test.describe('UI journeys @smoke', () => {
-  test('load the OpenSpeedTest widget only after the user chooses to', async ({ plexo }) => {
+  test('starts a real Cloudflare speed test only after the user chooses to', async ({ plexo }) => {
     const page = plexo.page
-    await page.route('https://openspeedtest.com/speedtest', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<title>Speed test fixture</title>'
-      })
-    )
+    let requests = 0
+    await page.route('https://speed.cloudflare.com/**', async (route) => {
+      requests += 1
+      await route.abort()
+    })
 
     await page.getByRole('button', { name: 'Settings' }).click()
     await page.getByRole('button', { name: 'Test internet speed' }).click()
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('heading', { name: 'Internet speed test' })).toBeVisible()
-    await expect(page.locator('iframe')).toHaveCount(0)
+    await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
+    await expect(dialog.getByText('Ready when you are')).toBeVisible()
+    expect(requests).toBe(0)
 
-    await dialog.getByRole('button', { name: 'Load speed test' }).click()
-    const frame = page.locator('iframe[title="OpenSpeedTest internet speed test"]')
-    await expect(frame).toBeVisible()
-    await expect(frame).toHaveAttribute('src', 'https://openspeedtest.com/speedtest')
-    await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin')
+    await dialog.getByRole('button', { name: 'Start test' }).click()
+    await expect(dialog.getByRole('alert')).toBeVisible()
+    await expect.poll(() => requests).toBeGreaterThan(0)
+    await expect(dialog.getByRole('button', { name: 'Run again' })).toBeVisible()
 
     await dialog.getByRole('button', { name: 'Close' }).click()
-    await expect(frame).toHaveCount(0)
+    await expect(dialog).toBeHidden()
   })
 
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
@@ -151,6 +149,27 @@ test.describe('UI journeys @smoke', () => {
 
 // What a user sets is still set after they reload or restart — checked only through what they see.
 test.describe('settings @smoke', () => {
+  test('settings stays inside a short window and scrolls to its last option', async ({ plexo }) => {
+    await plexo.evaluateMain((_electron) => {
+      _electron.BrowserWindow.getAllWindows()[0].setSize(700, 480)
+    }, null)
+    const page = plexo.page
+    await page.getByRole('button', { name: 'Settings' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('heading', { name: 'Plexo settings' })).toBeVisible()
+    const bounds = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+    })
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+    expect(bounds.left).toBeGreaterThanOrEqual(0)
+    expect(bounds.top).toBeGreaterThanOrEqual(0)
+    expect(bounds.right).toBeLessThanOrEqual(viewport.width)
+    expect(bounds.bottom).toBeLessThanOrEqual(viewport.height)
+    await dialog.evaluate((element) => element.scrollTo({ top: element.scrollHeight }))
+    await expect(dialog.getByRole('button', { name: 'Check now' })).toBeInViewport()
+  })
+
   test.describe('with an update available', () => {
     test.use({ appEnv: { PLEXO_FORCE_UPDATE_VERSION: '9.9.9' } })
 
