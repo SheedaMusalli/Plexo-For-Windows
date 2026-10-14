@@ -9,11 +9,25 @@ Plexo is a Windows download manager with a Chrome and Edge extension. It can spl
 
 ## Screenshots
 
-![Plexo v2 download history, completed and paused downloads, and transfer speed summary](docs/screenshots/history-v2.png)
+**Download history**
 
-![Plexo Internet speed test with duration selection and combined-network mode](docs/screenshots/speed-test-v2.png)
+![Plexo v2 download history with completed downloads](docs/screenshots/history-v2.png)
 
-![Plexo sequential download queue and optional start time](docs/screenshots/queue-v2.png)
+**Preparing a download and managing the queue**
+
+![Plexo link setup with save location and detected network connections](docs/screenshots/link-setup-v2.png)
+
+![Plexo sequential download queue with optional start time](docs/screenshots/queue-v2.png)
+
+**Settings and internet speed tests**
+
+![Plexo settings for save location, queue, theme, and updates](docs/screenshots/settings-v2.png)
+
+![Plexo internet speed test ready to start with duration selection](docs/screenshots/speed-test-ready-v2.png)
+
+![Completed Plexo internet speed test with ping, jitter, download, and upload results](docs/screenshots/speed-test-internet-v2.png)
+
+![Completed Plexo combined-network speed test using two selected network adapters](docs/screenshots/speed-test-combined-v2.png)
 
 ## Download and install
 
