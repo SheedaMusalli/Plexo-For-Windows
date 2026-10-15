@@ -6,6 +6,7 @@ import fc from 'fast-check'
 import { advanceBlock, retractBlock } from '../src/main/download/blockProgress'
 import { DownloadFile } from '../src/main/download/downloadFile'
 import { reserveDestinationPath } from '../src/main/download/paths'
+import { getDownloadCategory } from '../src/shared/downloadCategory'
 import type { BlockState } from '../src/shared/types'
 
 // K. What a block's byte counts mean when two attempts race for it, and how range writes land
@@ -19,6 +20,15 @@ const fresh = (): BlockState => ({
   status: 'downloading',
   bytesDownloaded: 0,
   bytesByInterface: {}
+})
+
+test('download categories use the expected Downloads subfolders', () => {
+  expect(getDownloadCategory('archive.7z')).toBe('Compressed')
+  expect(getDownloadCategory('track.flac')).toBe('Music')
+  expect(getDownloadCategory('report.pdf')).toBe('Documents')
+  expect(getDownloadCategory('clip.MP4')).toBe('Video')
+  expect(getDownloadCategory('installer.msi')).toBe('Programs')
+  expect(getDownloadCategory('unknown.data')).toBeUndefined()
 })
 const attributed = (block: BlockState): number =>
   Object.values(block.bytesByInterface).reduce((sum, bytes) => sum + bytes, 0)

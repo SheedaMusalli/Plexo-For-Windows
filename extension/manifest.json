@@ -15,7 +15,10 @@
     "scripting",
     "alarms"
   ],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -31,14 +34,25 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArx+m+FLm8nOzZIbcIuSIQqE3fXHAUsOKcwivjivrNfqtXBGQ0dccxtH94xZ2ni8THFXvcrqQQ/AIDJl5cdj71uwFhQByZv9W61mW3odPqS7Nla1pOKt+B6ZEDGkynFYAKg1pgRi05GMcL9g4rkPeVZpjBXPu/vsiAfkbGAzZdNXpyO8kpcpjmXEZNR7vHn6jN5sNqtUEmLOfWc78xBa3lHnFKQNsyHrgmu0pLvQwQWw4CwXLCUPqP21JtlTuLSjiikVGGrPy0/gyx7pSVmFl2fcD9zIhTbqVNBEEOXfHcv3XrK0deDF3uH9gOO0VUJhDu/s9Xp05geX+2IqgGlPCLwIDAQAB",
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["page.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "page.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     },
     {
-      "matches": ["https://www.youtube.com/*", "https://youtube.com/*", "https://m.youtube.com/*"],
-      "js": ["youtube.js"],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*",
+        "https://m.youtube.com/*"
+      ],
+      "js": [
+        "youtube.js"
+      ],
       "run_at": "document_idle"
     }
   ]

@@ -5,7 +5,7 @@
 
 Plexo is a Windows download manager with a Chrome and Edge extension. It can split supported downloads into parallel parts, use selected network connections, resume interrupted transfers, and keep a searchable download history.
 
-**Current release: v2.0.** Download the installer and browser extension from [GitHub Releases](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). Plexo for Windows is developed and maintained by **Sheeda Musalli**.
+**Current release: v2.0.1** Download the installer and browser extension from [GitHub Releases](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest). Plexo for Windows is developed and maintained by **Sheeda Musalli**.
 
 ## Screenshots
 
@@ -31,7 +31,7 @@ Plexo is a Windows download manager with a Chrome and Edge extension. It can spl
 
 ## Download and install
 
-1. Open the [latest release](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest) and download `plexo-2.0.0-setup.exe`. Run it to install the Windows x64 app and register its browser helper for your Windows account.
+1. Open the [latest release](https://github.com/SheedaMusalli/Plexo-For-Windows/releases/latest) and download `plexo-2.0.1-setup.exe`. Run it to install the Windows x64 app and register its browser helper for your Windows account.
 2. Download `Plexo.Chrome.Extension.zip` from that same release and extract it into a permanent folder.
 3. In Chrome, open `chrome://extensions`; in Edge, open `edge://extensions`. Turn on **Developer mode**, choose **Load unpacked**, and select the extracted folder containing `manifest.json`.
 4. Pin **Plexo Download Manager** from the browser Extensions menu. Open the extension popup and confirm it says **Connected**. If you updated Plexo, use **Reload** on the extensions page and refresh existing website tabs.

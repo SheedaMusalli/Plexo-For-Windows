@@ -214,6 +214,10 @@ export interface StartDownloadRequest {
   encryptedBrowserContext?: string
   url: string
   destinationDir: string
+  /** Directory for resumable partial bytes; the completed file is published into destinationDir. */
+  temporaryDir?: string
+  /** Save recognized formats into their familiar category subfolder of destinationDir. */
+  organizeByType?: boolean
   suggestedFileName: string
   /** Optional user-facing name for a transfer whose temporary filename is internal. */
   displayFileName?: string
@@ -236,6 +240,14 @@ export interface DownloadConfirmationRequest {
   requestId: string
   fileName: string
   details: string
+  defaultDestinationDir: string
+  defaultTemporaryDir: string
+}
+
+export interface DownloadConfirmationResponse {
+  accepted: boolean
+  destinationDir?: string
+  temporaryDir?: string
 }
 
 export interface QueuedDownload {

@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  DownloadConfirmationResponse,
   DownloadUpdate,
   NetworkInterfaceInfo,
   NetworkSpeedSample,
@@ -31,7 +32,7 @@ export interface IpcContract {
   revealInFolder: { args: [filePath: string]; result: void }
   openFile: { args: [filePath: string]; result: void }
   respondDownloadConfirmation: {
-    args: [requestId: string, accepted: boolean]
+    args: [requestId: string, response: DownloadConfirmationResponse]
     result: void
   }
   getQueuedDownloads: { args: []; result: QueuedDownload[] }

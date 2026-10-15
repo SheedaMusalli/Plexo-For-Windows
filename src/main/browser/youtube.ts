@@ -7,7 +7,8 @@ import type { DownloadManager } from '../download/downloadManager'
 import { listActiveInterfaces } from '../network/interfaces'
 import { probeUrl } from '../download/probe'
 import { loadSettings } from '../settings'
-import type { StartDownloadRequest } from '../../shared/types'
+import type { DownloadConfirmationResponse, StartDownloadRequest } from '../../shared/types'
+import { getDefaultTemporaryDir, getSuggestedDownloadDir } from '../download/paths'
 
 export function youtubeUrl(value: unknown): string {
   const url = new URL(String(value))
@@ -144,7 +145,10 @@ export class YoutubeDownloads {
   constructor(
     private readonly manager: DownloadManager,
     private readonly show: () => void,
-    private readonly confirmDownload: (fileName: string, details: string) => Promise<boolean>
+    private readonly confirmDownload: (
+      fileName: string,
+      details: string
+    ) => Promise<DownloadConfirmationResponse>
   ) {
     void this.removeAbandonedCookieFiles().catch(() => {})
     app.once('before-quit', () => {
@@ -465,8 +469,6 @@ export class YoutubeDownloads {
     let reservedOutput: string | undefined
     const childJobs: string[] = []
     try {
-      const folder = (await loadSettings()).destinationDir || app.getPath('downloads')
-      await mkdir(folder, { recursive: true })
       if (this.isCancelled(job)) return
       // yt-dlp only resolves signed formats. It never transfers the media bytes.
       const info = await this.extractInfo(job, cookies, userAgent)
@@ -479,14 +481,20 @@ export class YoutubeDownloads {
       const finalExtension = selected.video ? 'mp4' : selected.audio?.ext || 'm4a'
       const finalFileName = `${this.safeStem(job.title)}.${finalExtension}`
       job.message = 'Waiting for your confirmation…'
-      if (!(await this.confirmDownload(finalFileName, `YouTube · ${choice.label}`))) {
+      const confirmation = await this.confirmDownload(finalFileName, `YouTube · ${choice.label}`)
+      if (!confirmation.accepted) {
         job.state = 'cancelled'
         job.message = 'Download cancelled before any video data was transferred.'
         return
       }
       const settings = await loadSettings()
-      const destination = settings.destinationDir || app.getPath('downloads')
-      temporaryFolder = await mkdtemp(join(destination, `.plexo-youtube-${randomUUID()}-`))
+      const baseDir = settings.destinationDir || app.getPath('downloads')
+      const destination =
+        confirmation.destinationDir || getSuggestedDownloadDir(baseDir, finalFileName)
+      const temporaryDir = confirmation.temporaryDir || getDefaultTemporaryDir()
+      await mkdir(destination, { recursive: true })
+      await mkdir(temporaryDir, { recursive: true })
+      temporaryFolder = await mkdtemp(join(temporaryDir, `.plexo-youtube-${randomUUID()}-`))
       const names: string[] = []
       if (selected.video)
         names.push(
@@ -609,6 +617,7 @@ export class YoutubeDownloads {
     const request: StartDownloadRequest = {
       url: url.href,
       destinationDir: folder,
+      temporaryDir: folder,
       suggestedFileName: `${kind}.${(format.ext || 'bin').replace(/[^a-z0-9]/gi, '')}`,
       displayFileName,
       displayLocation: 'YouTube · preparing final file',

@@ -1,4 +1,5 @@
 import { stat } from 'node:fs/promises'
+import { isAbsolute } from 'node:path'
 import {
   clipboard,
   app,
@@ -217,6 +218,16 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null): Down
     const window = getWindow()
     if (!window || event.sender !== window.webContents) {
       throw new Error('Download confirmation came from an untrusted renderer.')
+    }
+    if (
+      !accepted ||
+      typeof accepted.accepted !== 'boolean' ||
+      (accepted.destinationDir !== undefined &&
+        (typeof accepted.destinationDir !== 'string' || !isAbsolute(accepted.destinationDir))) ||
+      (accepted.temporaryDir !== undefined &&
+        (typeof accepted.temporaryDir !== 'string' || !isAbsolute(accepted.temporaryDir)))
+    ) {
+      throw new Error('The download location selection is invalid.')
     }
     manager.resolveDownloadConfirmation(requestId, accepted)
   })

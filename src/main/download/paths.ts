@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { lstat, mkdir, open, rm, stat } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
+import { getDownloadCategory } from '../../shared/downloadCategory'
 
 export function getDefaultDownloadsDir(): string {
   return app.getPath('downloads')
@@ -8,6 +9,16 @@ export function getDefaultDownloadsDir(): string {
 
 export function getHomeDir(): string {
   return app.getPath('home')
+}
+
+/** Places recognized file types in familiar Downloads subfolders; unknown types use Downloads. */
+export function getSuggestedDownloadDir(baseDir: string, fileName: string): string {
+  const category = getDownloadCategory(fileName)
+  return category ? join(baseDir, category) : baseDir
+}
+
+export function getDefaultTemporaryDir(): string {
+  return join(app.getPath('temp'), 'Plexo', 'Downloads')
 }
 
 // Somewhere to stop rather than spin forever if every candidate is taken

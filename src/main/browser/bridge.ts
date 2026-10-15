@@ -7,8 +7,9 @@ import type { DownloadManager } from '../download/downloadManager'
 import { probeUrl } from '../download/probe'
 import { listActiveInterfaces } from '../network/interfaces'
 import { loadSettings } from '../settings'
+import { getDefaultTemporaryDir, getSuggestedDownloadDir } from '../download/paths'
 import { browserHeaders, httpUrl, type BrowserContext } from './headers'
-import type { ProbeResult } from '../../shared/types'
+import type { DownloadConfirmationResponse, ProbeResult } from '../../shared/types'
 import { testKnobs } from '../testKnobs'
 import { YoutubeDownloads } from './youtube'
 
@@ -21,6 +22,8 @@ interface Entry {
   downloadId?: string
   probe?: ProbeResult
   probedAt?: number
+  destinationDir?: string
+  temporaryDir?: string
 }
 
 async function checkFile(url: string, context: BrowserContext): Promise<ProbeResult> {
@@ -41,8 +44,11 @@ export async function startBrowserBridge(
   manager: DownloadManager,
   show: () => void
 ): Promise<Server> {
-  const confirmDownload = async (fileName: string, details: string): Promise<boolean> => {
-    if (testKnobs.userDataDir) return true
+  const confirmDownload = async (
+    fileName: string,
+    details: string
+  ): Promise<DownloadConfirmationResponse> => {
+    if (testKnobs.userDataDir) return { accepted: true }
     show()
     return manager.confirmExternalDownload(fileName, details)
   }
@@ -101,10 +107,14 @@ export async function startBrowserBridge(
           ? next.probe
           : await checkFile(next.url, next.context)
       const settings = await loadSettings()
+      const baseDir = settings.destinationDir || app.getPath('downloads')
       next.downloadId = await manager.start({
         browserRequestId: next.id,
         url: probe.finalUrl,
-        destinationDir: settings.destinationDir || app.getPath('downloads'),
+        destinationDir:
+          next.destinationDir ||
+          getSuggestedDownloadDir(baseDir, next.filename || probe.suggestedFileName),
+        temporaryDir: next.temporaryDir || getDefaultTemporaryDir(),
         suggestedFileName: next.filename || probe.suggestedFileName,
         totalBytes: probe.totalBytes ?? 0,
         supportsRanges: probe.supportsRanges,
@@ -185,11 +195,14 @@ export async function startBrowserBridge(
     }
     const displayName = entry.filename || entry.probe?.suggestedFileName || 'download'
     const size = entry.probe?.totalBytes
-    if (
-      !(await confirmDownload(displayName, `From ${url.origin}${size ? ` · ${size} bytes` : ''}`))
+    const confirmation = await confirmDownload(
+      displayName,
+      `From ${url.origin}${size ? ` · ${size} bytes` : ''}`
     )
-      return { ok: true, cancelled: true }
+    if (!confirmation.accepted) return { ok: true, cancelled: true }
     if (!isConnected()) return { ok: true, cancelled: true }
+    entry.destinationDir = confirmation.destinationDir
+    entry.temporaryDir = confirmation.temporaryDir
     entries.push(entry)
     try {
       await save()

@@ -1,6 +1,6 @@
 import { sealRequest, unsealRequest } from '../browser/credentials'
 import { randomUUID } from 'node:crypto'
-import { readFile, readdir, rename, rm, stat, statfs, writeFile } from 'node:fs/promises'
+import { open, readFile, readdir, rename, rm, stat, statfs, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { BrowserWindow } from 'electron'
 import { app, Notification, powerSaveBlocker, safeStorage } from 'electron'
@@ -13,18 +13,25 @@ import type {
   DownloadStatus,
   DownloadUpdate,
   DownloadConfirmationRequest,
+  DownloadConfirmationResponse,
   NetworkInterfaceInfo,
   NetworkStatus,
   QueuedDownload,
   StartDownloadRequest
 } from '../../shared/types'
 import { testKnobs, testStreamsPerNetwork } from '../testKnobs'
+import { loadSettings } from '../settings'
 import { advanceBlock, retractBlock } from './blockProgress'
 import { ConcurrencyController, type Action, type Snapshot } from './concurrency'
 import { downloadChunk, fetchRange, HttpStatusError, RemoteChangedError } from './chunkDownloader'
 import { DownloadFile } from './downloadFile'
 import { compareVersion, type FileVersion } from './fileVersion'
-import { ensureDirectory, reserveDestinationPath } from './paths'
+import {
+  ensureDirectory,
+  getDefaultTemporaryDir,
+  getSuggestedDownloadDir,
+  reserveDestinationPath
+} from './paths'
 import { probeUrl } from './probe'
 import {
   interleave,
@@ -136,6 +143,7 @@ interface DownloadRuntime {
   state: DownloadState
   publicationPath?: string
   publicationIdentity?: { dev: number; ino: number }
+  publicationTempPath?: string
   requestPayload: StartDownloadRequest
   chunkRuntimes: Map<number, ChunkRuntime>
   /** The running streams' workers, by stream id. Empty unless the download is running. */
@@ -195,6 +203,7 @@ interface PersistedDownloadBase {
   partialPath: string
   publicationPath?: string
   publicationIdentity?: { dev: number; ino: number }
+  publicationTempPath?: string
   requestPayload: StartDownloadRequest
   /** The networks, as saved before a download listed them in its state. Read only to fill in
    * `networks` for a download saved that way. */
@@ -470,7 +479,7 @@ export class DownloadManager {
   private runtimes = new Map<string, DownloadRuntime>()
   private downloadConfirmations = new Map<
     string,
-    { resolve: (accepted: boolean) => void; timer: NodeJS.Timeout }
+    { resolve: (response: DownloadConfirmationResponse) => void; timer: NodeJS.Timeout }
   >()
   private readonly initialization: Promise<void>
   private queuedDownloads: QueuedDownload[] = []
@@ -576,7 +585,7 @@ export class DownloadManager {
         id: randomUUID(),
         url: parsed.href,
         fileName: fileName.slice(0, 240),
-        destinationDir,
+        destinationDir: getSuggestedDownloadDir(destinationDir, fileName),
         scheduledAt
       } satisfies QueuedDownload
     })
@@ -747,13 +756,17 @@ export class DownloadManager {
               state.fileName = basename(publishedPath)
               state.error = undefined
               state.completedAt ??= persisted.savedAt
-              if (size >= 0) await file.discard()
+              await file.discard()
+              if (persisted.publicationTempPath)
+                await rm(persisted.publicationTempPath, { force: true }).catch(() => {})
             } else if (size < 0) {
               state.status = 'error'
               state.error =
                 'The partial download file is missing. Remove this download and start again.'
               state.resumable = false
             } else {
+              if (persisted.publicationTempPath)
+                await rm(persisted.publicationTempPath, { force: true }).catch(() => {})
               for (const block of blocks) {
                 const length = block.rangeEnd === null ? 0 : block.rangeEnd - block.rangeStart + 1
                 if (
@@ -772,6 +785,7 @@ export class DownloadManager {
           const runtime = newRuntime(state, unsealRequest(persisted.requestPayload), file, blocks)
           runtime.publicationPath = persisted.publicationPath
           runtime.publicationIdentity = persisted.publicationIdentity
+          runtime.publicationTempPath = persisted.publicationTempPath
           this.recomputeAggregates(runtime)
           restored.push(runtime)
         } catch {
@@ -821,9 +835,12 @@ export class DownloadManager {
   }
 
   /** Ask the themed renderer before starting an external browser-originated download. */
-  async confirmExternalDownload(fileName: string, details: string): Promise<boolean> {
+  async confirmExternalDownload(
+    fileName: string,
+    details: string
+  ): Promise<DownloadConfirmationResponse> {
     const window = this.getWindow()
-    if (!window || window.isDestroyed()) return false
+    if (!window || window.isDestroyed()) return { accepted: false }
     const contents = window.webContents
     if (contents.isLoadingMainFrame()) {
       await new Promise<void>((resolve) => {
@@ -838,22 +855,32 @@ export class DownloadManager {
         contents.once('destroyed', done)
       })
     }
-    if (window.isDestroyed() || contents.isDestroyed()) return false
+    if (window.isDestroyed() || contents.isDestroyed()) return { accepted: false }
+    const baseDir = (await loadSettings()).destinationDir || app.getPath('downloads')
     const requestId = randomUUID()
-    return new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => this.resolveDownloadConfirmation(requestId, false), 5 * 60_000)
+    return new Promise<DownloadConfirmationResponse>((resolve) => {
+      const timer = setTimeout(
+        () => this.resolveDownloadConfirmation(requestId, { accepted: false }),
+        5 * 60_000
+      )
       this.downloadConfirmations.set(requestId, { resolve, timer })
-      const request: DownloadConfirmationRequest = { requestId, fileName, details }
+      const request: DownloadConfirmationRequest = {
+        requestId,
+        fileName,
+        details,
+        defaultDestinationDir: getSuggestedDownloadDir(baseDir, fileName),
+        defaultTemporaryDir: getDefaultTemporaryDir()
+      }
       contents.send(IpcChannels.downloadConfirmation, request)
     })
   }
 
-  resolveDownloadConfirmation(requestId: string, accepted: boolean): void {
+  resolveDownloadConfirmation(requestId: string, response: DownloadConfirmationResponse): void {
     const pending = this.downloadConfirmations.get(requestId)
     if (!pending) return
     clearTimeout(pending.timer)
     this.downloadConfirmations.delete(requestId)
-    pending.resolve(accepted)
+    pending.resolve(response)
   }
 
   /** Plexo shows one download at a time (see useAppStore's currentDownload) — starting a second
@@ -882,6 +909,18 @@ export class DownloadManager {
   }
 
   private async startInternal(requestPayload: StartDownloadRequest): Promise<string> {
+    if (requestPayload.organizeByType) {
+      requestPayload = {
+        ...requestPayload,
+        destinationDir: getSuggestedDownloadDir(
+          requestPayload.destinationDir,
+          requestPayload.displayFileName || requestPayload.suggestedFileName
+        )
+      }
+    }
+    if (!requestPayload.temporaryDir) {
+      requestPayload = { ...requestPayload, temporaryDir: getDefaultTemporaryDir() }
+    }
     await this.initialization
     if (this.hasActiveDownload()) {
       throw new Error('A download is already in progress — finish or remove it first.')
@@ -902,6 +941,9 @@ export class DownloadManager {
 
     await ensureDirectory(requestPayload.destinationDir)
     await ensureDiskSpace(requestPayload.destinationDir, requestPayload.totalBytes)
+    const temporaryDir = requestPayload.temporaryDir!
+    await ensureDirectory(temporaryDir)
+    await ensureDiskSpace(temporaryDir, requestPayload.totalBytes)
 
     const plan = planDownload({
       totalBytes: requestPayload.totalBytes,
@@ -920,7 +962,16 @@ export class DownloadManager {
     )
 
     const id = randomUUID()
-    const file = new DownloadFile(`${destinationPath}.plexo`)
+    const reservationPath = `${destinationPath}.plexo`
+    const partialPath = join(temporaryDir, `.plexo-download-${randomUUID()}.partial`)
+    try {
+      const handle = await open(partialPath, 'wx+')
+      await handle.close()
+    } catch (error) {
+      await rm(reservationPath, { force: true }).catch(() => {})
+      throw error
+    }
+    const file = new DownloadFile(partialPath, reservationPath)
 
     // The UI caps how many cells it renders separately (see BlockGrid), by bucketing these
     // blocks rather than by shrinking their count here.
@@ -1296,14 +1347,16 @@ export class DownloadManager {
       const publishedPath = await runtime.file.publish(
         runtime.state.destinationPath,
         runtime.state.totalBytes,
-        async (candidate) => {
+        async (candidate, publicationTempPath) => {
           runtime.publicationPath = candidate
-          const partial = await stat(runtime.file.path)
+          runtime.publicationTempPath = publicationTempPath
+          const partial = await stat(publicationTempPath ?? runtime.file.path)
           runtime.publicationIdentity = { dev: partial.dev, ino: partial.ino }
           await this.persistNow(runtime, true)
         }
       )
       runtime.state.destinationPath = publishedPath
+      runtime.publicationTempPath = undefined
       runtime.state.fileName = runtime.requestPayload.displayFileName || basename(publishedPath)
       runtime.state.status = 'completed'
       runtime.state.completedAt = Date.now()
@@ -2434,6 +2487,7 @@ export class DownloadManager {
           partialPath: runtime.file.path,
           publicationPath: runtime.publicationPath,
           publicationIdentity: runtime.publicationIdentity,
+          publicationTempPath: runtime.publicationTempPath,
           requestPayload: sealRequest(runtime.requestPayload)
         }
         if (runtime.state.status === 'downloading' || runtime.state.status === 'paused') {

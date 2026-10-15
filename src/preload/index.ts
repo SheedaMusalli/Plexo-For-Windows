@@ -4,6 +4,7 @@ import type { IpcContract } from '../shared/ipc-contract'
 import type {
   AppSettings,
   DownloadConfirmationRequest,
+  DownloadConfirmationResponse,
   DownloadUpdate,
   InitialState,
   NetworkInterfaceInfo,
@@ -43,8 +44,8 @@ const plexoApi = {
   readClipboardText: () => invoke('readClipboardText'),
   revealInFolder: (filePath: string) => invoke('revealInFolder', filePath),
   openFile: (filePath: string) => invoke('openFile', filePath),
-  respondDownloadConfirmation: (requestId: string, accepted: boolean) =>
-    invoke('respondDownloadConfirmation', requestId, accepted),
+  respondDownloadConfirmation: (requestId: string, response: DownloadConfirmationResponse) =>
+    invoke('respondDownloadConfirmation', requestId, response),
   getQueuedDownloads: () => invoke('getQueuedDownloads'),
   queueDownloads: (urls: string[], destinationDir: string, scheduledAt: number | null) =>
     invoke('queueDownloads', urls, destinationDir, scheduledAt),

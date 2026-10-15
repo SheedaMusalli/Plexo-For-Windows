@@ -4,6 +4,16 @@
 
   root.PlexoChangelog = [
     {
+      version: 'v2.0.1',
+      items: [
+        {
+          kind: 'improved',
+          title: 'Choose download and temporary data folders',
+          text: 'Review and change the final save location and temporary transfer-data folder before starting each download.'
+        }
+      ]
+    },
+    {
       version: 'v2.0.0',
       items: [
         {

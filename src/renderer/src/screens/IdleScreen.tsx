@@ -1,4 +1,5 @@
 import type { ProbeResult } from '@shared/types'
+import { getDownloadCategory } from '@shared/downloadCategory'
 import { cn } from 'cn'
 import { AlertTriangle, ClipboardPaste, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -76,6 +77,7 @@ export function IdleScreen(): React.JSX.Element {
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const [fileNameOverride, setFileNameOverride] = useState<string | null>(null)
+  const [destinationOverride, setDestinationOverride] = useState<string | null>(null)
   // Auto unless the user picks a count for this download; not remembered for the next one.
   const [streamsChoice, setStreamsChoice] = useState<StreamsChoice>('auto')
 
@@ -94,6 +96,7 @@ export function IdleScreen(): React.JSX.Element {
     const requestId = ++probeRequestId.current
     setProbe({ status: 'probing' })
     setFileNameOverride(null)
+    setDestinationOverride(null)
     const timer = setTimeout(async () => {
       try {
         const result = await window.plexo.probeUrl(trimmed)
@@ -109,6 +112,13 @@ export function IdleScreen(): React.JSX.Element {
   }, [url])
 
   const ready = probe.status === 'ready' ? probe.result : null
+  const detectedFileName = fileNameOverride?.trim() || ready?.suggestedFileName || ''
+  const downloadCategory = getDownloadCategory(detectedFileName)
+  const displayDestinationDir =
+    destinationOverride ||
+    (downloadCategory
+      ? `${destinationDir.replace(/[\\/]+$/, '')}${destinationDir.includes('\\') ? '\\' : '/'}${downloadCategory}`
+      : destinationDir)
   const multiChunkAllowed = ready !== null && ready.supportsRanges && ready.totalBytes !== null
   const isSingleStreamOnly = ready !== null && !multiChunkAllowed
   // One request has to carry the whole file: either the server can't serve parts of it, or it
@@ -182,8 +192,11 @@ export function IdleScreen(): React.JSX.Element {
   }
 
   const handleBrowse = async (): Promise<void> => {
-    const chosen = await window.plexo.chooseDestinationFolder(destinationDir)
-    if (chosen) setDestinationDir(chosen)
+    const chosen = await window.plexo.chooseDestinationFolder(displayDestinationDir)
+    if (chosen) {
+      setDestinationDir(chosen)
+      setDestinationOverride(chosen)
+    }
   }
 
   const handlePaste = async (): Promise<void> => {
@@ -198,7 +211,7 @@ export function IdleScreen(): React.JSX.Element {
     try {
       await window.plexo.startDownload({
         url: probe.result.finalUrl,
-        destinationDir,
+        destinationDir: displayDestinationDir,
         suggestedFileName: fileNameOverride?.trim() || probe.result.suggestedFileName,
         totalBytes: probe.result.totalBytes ?? 0,
         supportsRanges: multiChunkAllowed,
@@ -305,7 +318,7 @@ export function IdleScreen(): React.JSX.Element {
         <div className="flex h-9 items-center gap-[9px] rounded-[9px] border border-border px-3">
           <div className={fieldLabelClass}>TO</div>
           <div className="min-w-0 flex-1 truncate font-mono text-[12.5px] leading-normal text-[var(--text-secondary)]">
-            {toDisplayPath(destinationDir, homeDir)}
+            {toDisplayPath(displayDestinationDir, homeDir)}
           </div>
           <Button
             type="button"
