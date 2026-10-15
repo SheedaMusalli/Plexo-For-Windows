@@ -3,6 +3,9 @@ import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog
 import { cn } from 'cn'
 import { buttonVariants } from './button'
 
+const titleBarSafeArea =
+  window.plexo.platform === 'win32' ? 'env(titlebar-area-height, 44px)' : '0px'
+
 function AlertDialog({ ...props }: AlertDialogPrimitive.Root.Props): React.JSX.Element {
   return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
 }
@@ -29,6 +32,7 @@ function AlertDialogBackdrop({
 
 function AlertDialogContent({
   className,
+  style,
   ...props
 }: AlertDialogPrimitive.Popup.Props): React.JSX.Element {
   return (
@@ -37,9 +41,14 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Popup
         data-slot="alert-dialog-content"
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-popover p-4 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
+          'fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg bg-popover p-4 text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
           className
         )}
+        style={{
+          ...style,
+          top: `calc(50% + ${titleBarSafeArea} / 2)`,
+          maxHeight: `calc(100dvh - ${titleBarSafeArea} - 2rem)`
+        }}
         {...props}
       />
     </AlertDialogPrimitive.Portal>

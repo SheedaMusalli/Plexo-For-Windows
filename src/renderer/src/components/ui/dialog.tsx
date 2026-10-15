@@ -5,6 +5,12 @@ import { cn } from 'cn'
 import { Button } from '@renderer/components/ui/button'
 import { XIcon } from 'lucide-react'
 
+// Windows' native caption buttons sit over the top edge of the renderer when titleBarOverlay is
+// enabled. Keep every dialog inside the remaining client area so its own close button cannot land
+// under the OS controls. Other platforms use their regular window/content bounds.
+const titleBarSafeArea =
+  window.plexo.platform === 'win32' ? 'env(titlebar-area-height, 44px)' : '0px'
+
 function Dialog({ ...props }: DialogPrimitive.Root.Props): React.JSX.Element {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
 }
@@ -37,6 +43,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props):
 function DialogContent({
   className,
   children,
+  style,
   showCloseButton = true,
   size = 'default',
   ...props
@@ -54,6 +61,11 @@ function DialogContent({
           size === 'wide' ? 'sm:max-w-2xl' : 'sm:max-w-sm',
           className
         )}
+        style={{
+          ...style,
+          top: `calc(50% + ${titleBarSafeArea} / 2)`,
+          maxHeight: `calc(100dvh - ${titleBarSafeArea} - 2rem)`
+        }}
         {...props}
       >
         {children}
@@ -71,9 +83,18 @@ function DialogContent({
   )
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<'div'>): React.JSX.Element {
+function DialogHeader({
+  className,
+  style,
+  ...props
+}: React.ComponentProps<'div'>): React.JSX.Element {
   return (
-    <div data-slot="dialog-header" className={cn('flex flex-col gap-2', className)} {...props} />
+    <div
+      data-slot="dialog-header"
+      className={cn('flex flex-col gap-2', className)}
+      style={{ ...style, paddingRight: '2.5rem' }}
+      {...props}
+    />
   )
 }
 

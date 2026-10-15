@@ -487,7 +487,7 @@ export function SpeedTestDialog({
         size="wide"
         className="max-h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain p-4 sm:p-5"
       >
-        <DialogHeader className="pr-7">
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gauge className="size-4" />
             {testMode === 'internet'

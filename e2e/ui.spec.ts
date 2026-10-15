@@ -28,6 +28,11 @@ async function stubNativeUi(
   }, destination)
 }
 
+async function openAddUrl(page: Page): Promise<void> {
+  const addUrl = page.getByRole('button', { name: '+ Add URL', exact: true })
+  if (await addUrl.isVisible()) await addUrl.click()
+}
+
 test.describe('UI journeys @smoke', () => {
   test('starts a real Cloudflare speed test only after the user chooses to', async ({ plexo }) => {
     const page = plexo.page
@@ -59,7 +64,7 @@ test.describe('UI journeys @smoke', () => {
     await expect(dialog).toBeHidden()
   })
 
-  test('speed test dialog uses the available width in a compact window', async ({ plexo }) => {
+  test('speed test dialog stays inside the safe area in a compact window', async ({ plexo }) => {
     await plexo.evaluateMain((_electron) => {
       _electron.BrowserWindow.getAllWindows()[0].setSize(720, 650)
     }, null)
@@ -71,13 +76,25 @@ test.describe('UI journeys @smoke', () => {
     await expect(dialog.getByRole('heading', { name: 'Plexo internet speed test' })).toBeVisible()
     const bounds = await dialog.evaluate((element) => {
       const rect = element.getBoundingClientRect()
-      return { left: rect.left, right: rect.right, width: rect.width }
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width
+      }
     })
-    const viewportWidth = await page.evaluate(() => innerWidth)
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+    const platform = await page.evaluate(() => window.plexo.platform)
 
     expect(bounds.width).toBeGreaterThan(600)
     expect(bounds.left).toBeGreaterThanOrEqual(0)
-    expect(bounds.right).toBeLessThanOrEqual(viewportWidth)
+    expect(bounds.right).toBeLessThanOrEqual(viewport.width)
+    expect(bounds.bottom).toBeLessThanOrEqual(viewport.height)
+    if (platform === 'win32') expect(bounds.top).toBeGreaterThanOrEqual(44)
+    const closeBounds = await dialog.locator('[data-slot="dialog-close"]').boundingBox()
+    expect(closeBounds).not.toBeNull()
+    if (platform === 'win32' && closeBounds) expect(closeBounds.y).toBeGreaterThanOrEqual(44)
     await expect(dialog.getByLabel('Speed test duration')).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Start test' })).toBeInViewport()
     for (const label of ['Ping result', 'Jitter result', 'Download result', 'Upload result']) {
@@ -240,6 +257,7 @@ test.describe('UI journeys @smoke', () => {
     await stubNativeUi(plexo, dirs.dest)
     const page = plexo.page
 
+    await openAddUrl(page)
     await page.getByRole('button', { name: 'Browse…' }).click()
     await page.getByRole('textbox', { name: 'LINK' }).fill(origin.url())
     const start = page.getByRole('button', { name: 'Start' })
@@ -274,6 +292,7 @@ test.describe('UI journeys @smoke', () => {
     const origin = await serve({ size: SIZE })
     await stubNativeUi(plexo, dirs.dest)
     const page = plexo.page
+    await openAddUrl(page)
     await page.getByRole('button', { name: 'Browse…' }).click()
     await page.getByRole('textbox', { name: 'LINK' }).fill(origin.url())
 
@@ -281,6 +300,16 @@ test.describe('UI journeys @smoke', () => {
     await page.getByRole('button', { name: 'Start' }).click()
     await reached
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    const alert = page.getByRole('alertdialog')
+    const alertBounds = await alert.boundingBox()
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+    expect(alertBounds).not.toBeNull()
+    if (alertBounds) {
+      expect(alertBounds.x).toBeGreaterThanOrEqual(0)
+      expect(alertBounds.y).toBeGreaterThanOrEqual(0)
+      expect(alertBounds.x + alertBounds.width).toBeLessThanOrEqual(viewport.width)
+      expect(alertBounds.y + alertBounds.height).toBeLessThanOrEqual(viewport.height)
+    }
     await page.getByRole('button', { name: 'Cancel download' }).click()
     origin.release()
 
@@ -299,6 +328,7 @@ test.describe('UI journeys @smoke', () => {
     const origin = await serve({ size: SIZE })
     origin.setRule(() => ({ status: 404 }))
     const page = plexo.page
+    await openAddUrl(page)
     await page.getByRole('textbox', { name: 'LINK' }).fill(origin.url())
     await expect(page.getByText(/could not be found/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Start' })).toBeDisabled()
@@ -356,6 +386,7 @@ test.describe('settings @smoke', () => {
       await themeToggle.click()
 
       await stubNativeUi(plexo, dirs.dest)
+      await openAddUrl(page())
       await page().getByRole('button', { name: 'Browse…' }).click()
 
       await page().getByRole('button', { name: 'Edit network' }).first().click()
