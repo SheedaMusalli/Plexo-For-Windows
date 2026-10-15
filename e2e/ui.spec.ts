@@ -208,6 +208,15 @@ test.describe('UI journeys @smoke', () => {
   })
 
   test('schedule a linear batch and cancel one queued link', async ({ plexo }) => {
+    const encryptionAvailable = await plexo.evaluateMain(
+      ({ safeStorage }) => safeStorage.isEncryptionAvailable(),
+      null
+    )
+    test.skip(
+      !encryptionAvailable,
+      'This runner has no OS credential store for encrypted queue data'
+    )
+
     const page = plexo.page
     await page.getByRole('button', { name: /^Open download queue/ }).click()
     await expect(page.getByRole('heading', { name: 'Schedule and batch downloads' })).toBeVisible()
@@ -376,6 +385,10 @@ test.describe('settings @smoke', () => {
       dirs
     }) => {
       const page = (): Page => plexo.page
+      const homeDir = await plexo.evaluateMain(({ app }) => app.getPath('home'), null)
+      const displayedDestination = dirs.dest.startsWith(homeDir)
+        ? `~${dirs.dest.slice(homeDir.length)}`
+        : dirs.dest
       await page().getByRole('button', { name: 'Not now' }).click()
 
       const themeToggle = page().getByRole('button', { name: /^Switch to (dark|light) theme$/ })
@@ -399,8 +412,11 @@ test.describe('settings @smoke', () => {
         // dialog's absence below is a real "stayed dismissed", not "not checked yet".
         await expect(page().getByRole('link', { name: 'Update available: 9.9.9' })).toBeVisible()
         await expect(page().getByRole('alertdialog')).toBeHidden()
+        await openAddUrl(page())
         await expect(page().getByRole('button', { name: labelAfterSwitch })).toBeVisible()
-        await expect(page().getByText(dirs.dest)).toBeVisible()
+        await expect(page().getByText('TO', { exact: true }).locator('..')).toContainText(
+          displayedDestination
+        )
         await expect(page().getByText('Office fibre')).toBeVisible()
         await page().getByRole('button', { name: 'Edit network' }).first().click()
         await expect(page().getByRole('button', { name: 'Violet' })).toHaveAttribute(
@@ -427,16 +443,19 @@ test.describe('settings @smoke', () => {
     // folder is baked into the test.
     const choices = (): Promise<string> =>
       plexo.page.getByText('TO', { exact: true }).locator('..').innerText()
+    await openAddUrl(plexo.page)
     const fresh = await choices()
 
     await plexo.quit()
     await writeFile(settingsPath, '{"destinationDir": "/')
     await plexo.launch()
+    await openAddUrl(plexo.page)
     expect(await choices()).toEqual(fresh)
 
     await plexo.quit()
     await writeFile(settingsPath, JSON.stringify({ destinationDir: join(dirs.dest, 'unplugged') }))
     await plexo.launch()
+    await openAddUrl(plexo.page)
     expect(await choices()).toEqual(fresh)
   })
 })
@@ -445,6 +464,7 @@ test.describe('no networks', () => {
   test.use({ appEnv: { PLEXO_E2E_INTERFACES: '' } })
 
   test('a network appearing takes you back to the start screen @smoke', async ({ plexo }) => {
+    await openAddUrl(plexo.page)
     await expect(plexo.page.getByText('No networks to combine')).toBeVisible()
     await plexo.evaluateMain(
       (_electron, value) => {

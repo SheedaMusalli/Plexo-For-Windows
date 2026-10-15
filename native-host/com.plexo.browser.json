@@ -3,7 +3,5 @@
   "description": "Plexo browser integration",
   "path": "Plexo.BrowserHost.exe",
   "type": "stdio",
-  "allowed_origins": [
-    "chrome-extension://hhepjnimojcdbcifmjaflopikglidjbo/"
-  ]
+  "allowed_origins": ["chrome-extension://hhepjnimojcdbcifmjaflopikglidjbo/"]
 }
