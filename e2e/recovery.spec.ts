@@ -116,9 +116,12 @@ test.describe('persisted state on disk @smoke', () => {
     serve
   }) => {
     await pausedDownload(plexo, serve)
-    const partial = `${(await plexo.current())!.destinationPath}.plexo`
+    const current = (await plexo.current())!
+    const manifest = JSON.parse(
+      await readFile(join(plexo.dirs.userData, 'downloads', current.id, 'manifest.json'), 'utf-8')
+    )
     await plexo.quit()
-    await rm(partial)
+    await rm(manifest.partialPath)
     await plexo.launch()
     expect((await plexo.current())?.status).toBe('error')
     expect((await plexo.current())?.error).toMatch(/partial download file is missing/)

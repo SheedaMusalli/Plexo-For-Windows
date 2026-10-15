@@ -9,7 +9,7 @@ import { basename, dirname, extname, join } from 'node:path'
 export class DownloadFile {
   constructor(
     readonly path: string,
-    private readonly reservationPath = path
+    readonly reservationPath = path
   ) {}
 
   /** Every writer has its own descriptor and explicit offset. Never use append mode here. */

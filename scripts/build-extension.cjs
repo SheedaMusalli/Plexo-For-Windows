@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
+const { execFileSync } = require('node:child_process')
 const AdmZip = require('adm-zip')
 const root = path.resolve(__dirname, '..')
 const keyDir = path.join(root, '.signing')
@@ -24,12 +25,12 @@ const id = [...idBytes.toString('hex')]
 const manifestFile = path.join(root, 'extension', 'manifest.json')
 const manifest = JSON.parse(fs.readFileSync(manifestFile))
 manifest.key = publicKey.toString('base64')
-fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2))
+fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`)
 fs.copyFileSync(path.join(root, 'build', 'icon.png'), path.join(root, 'extension', 'icon.png'))
 fs.writeFileSync(path.join(root, 'native-host', 'extension-id.txt'), id)
 fs.writeFileSync(
   path.join(root, 'native-host', 'com.plexo.browser.json'),
-  JSON.stringify(
+  `${JSON.stringify(
     {
       name: 'com.plexo.browser',
       description: 'Plexo browser integration',
@@ -39,7 +40,18 @@ fs.writeFileSync(
     },
     null,
     2
-  )
+  )}\n`
+)
+// Keep generated metadata in the same format enforced by `npm run format:check`.
+execFileSync(
+  process.execPath,
+  [
+    require.resolve('prettier/bin/prettier.cjs'),
+    '--write',
+    manifestFile,
+    path.join(root, 'native-host', 'com.plexo.browser.json')
+  ],
+  { stdio: 'inherit' }
 )
 const out = path.join(root, 'release')
 fs.mkdirSync(out, { recursive: true })

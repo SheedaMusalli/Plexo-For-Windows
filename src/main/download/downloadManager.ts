@@ -201,6 +201,7 @@ interface DownloadRuntime {
 interface PersistedDownloadBase {
   savedAt: number
   partialPath: string
+  reservationPath?: string
   publicationPath?: string
   publicationIdentity?: { dev: number; ino: number }
   publicationTempPath?: string
@@ -729,7 +730,12 @@ export class DownloadManager {
             if (block.status === 'downloading') block.status = 'pending'
           }
 
-          const file = new DownloadFile(persisted.partialPath)
+          // The destination reservation is separate from the resumable staging file. Recreate
+          // that association after restart so recovery cleanup removes the reservation too.
+          const file = new DownloadFile(
+            persisted.partialPath,
+            persisted.reservationPath ?? `${state.destinationPath}.plexo`
+          )
           if (state.status === 'paused') {
             const size = await file.size().catch(() => -1)
             const publishedPath = persisted.publicationPath ?? state.destinationPath
@@ -2485,6 +2491,7 @@ export class DownloadManager {
           state: structuredClone(state),
           ...saveBlocks(blocks ?? runtime.blocks),
           partialPath: runtime.file.path,
+          reservationPath: runtime.file.reservationPath,
           publicationPath: runtime.publicationPath,
           publicationIdentity: runtime.publicationIdentity,
           publicationTempPath: runtime.publicationTempPath,
